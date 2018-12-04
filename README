@@ -22,7 +22,7 @@ SERVING OVER TELNET
 -------------------
 
   Right now, in order to serve this over telnet, you need to use telnetd with
-either inetd or xinetd.  Assuming you are running inetutils-inetd and inetd,
+either inetd or xinetd.  Assuming you are running inetutils-telnetd and inetd,
 your config should look like this:
 
   /etc/services, replacing <port> with the port you'd like to put the site on:
