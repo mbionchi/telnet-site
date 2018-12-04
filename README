@@ -1,0 +1,71 @@
+TELNET-SITE
+===========
+
+DESCRIPTION
+-----------
+
+  telnet-site - a glorified text file reader intented to be used as a telnet site.
+
+  The telnet-site executable takes one argument, which is the path to the directory
+that is the root of the site and contains text files to be displayed.
+
+  The text files can be marked up with a minimal, non-intrusive syntax that will
+allow telnet-site to do things such as flowing paragraphs and indenting list items.
+The syntax is described in the FORMATTING section.
+
+BUILDING
+---------
+
+  gcc -lncurses site.c
+
+SERVING OVER TELNET
+-------------------
+
+  Right now, in order to serve this over telnet, you need to use telnetd with
+either inetd or xinetd.  Assuming you are running inetutils-inetd and inetd,
+your config should look like this:
+
+  /etc/services, replacing <port> with the port you'd like to put the site on:
+
+mytelnetsite <port>/tcp
+
+  /etc/inetd.conf, replacing <user> with the user you'd like to run the site as
+and <path-to-wrapper-script> with the path to the wrapper script (see below):
+
+mytelnetsite stream tcp nowait <user> /usr/sbin/tcpd /usr/sbin/telnetd -h -E <path-to-wrapper-script>
+
+  And finally, you should create a small script at <path-to-wrapper-script>,
+with the following:
+
+#!/bin/sh
+exec <path-to-a.out> <path-to-site.d>
+
+  where <path-to-a.out> is the path to the telnet-site executable, and
+<path-to-site.d> is the path to the root directory of the site.
+
+FORMATTING
+----------
+
+  - If a line in the file ends in a space character (ascii 0x20 that is), then the
+newline at the end is "escaped" and the next line from the file is treated as a part
+of the same paragraph and will be reflowed based on the screen width, for example:
+
+  Hello 
+world!
+
+  Will be treated as a single line due to Hello having a trailing space.  (I guess
+you might need a hex editor to see this one :^))
+
+  - If the first non-whitespace character at the beginning of a line is not a
+letter, then this line is treated as a list item and, if it needs re-flowing,
+will be aligned to the first letter character on this line, for example:
+
+  [] this is list item number one
+
+  Given limited columns, can be re-flowed by the algorithm as:
+
+  [] this is
+     list
+     item
+     number
+     one
