@@ -18,7 +18,7 @@ The syntax is described in the FORMATTING section.
 BUILDING
 ---------
 
-  gcc -lncurses site.c scroll.c render.c
+  gcc -lncurses site.c scroll.c render.c data.c
 
 SERVING OVER TELNET
 -------------------
