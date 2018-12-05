@@ -12,7 +12,7 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with untrace.  If not, see <https://www.gnu.org/licenses/>.
+ *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "render.h"
