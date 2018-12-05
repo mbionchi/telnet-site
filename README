@@ -13,10 +13,12 @@ that is the root of the site and contains text files to be displayed.
 allow telnet-site to do things such as flowing paragraphs and indenting list items.
 The syntax is described in the FORMATTING section.
 
+  Both the text window as well as the file index window are scrollable.
+
 BUILDING
 ---------
 
-  gcc -lncurses site.c
+  gcc -lncurses site.c scroll.c render.c
 
 SERVING OVER TELNET
 -------------------

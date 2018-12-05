@@ -15,6 +15,9 @@
  *   along with untrace.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "render.h"
+#include "scroll.h"
+#include "data.h"
 #include <ncurses.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,22 +26,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/stat.h>
-
-int index_left_margin = 3;
-int separator_left_margin;
-int content_right_margin = 8;
-int index_n_items;
-
-struct line {
-    char *line;
-    struct line *prev, *next;
-};
-
-struct section {
-    char *title;
-    char *filename;
-    struct line *content;
-};
 
 void print_lines(struct line *lines) {
     struct line *iter = lines;
@@ -137,35 +124,6 @@ struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t
     *nmemb = i;
     qsort(base, *nmemb, sizeof(struct section*), &compare_sections);
     return base;
-}
-
-void render_separator(int n, int selected) {
-    selected++;
-    int i;
-    for (i=0; i<n; i++) {
-        if (i == selected) {
-            mvprintw(i, separator_left_margin, "< ");
-        } else {
-            mvprintw(i, separator_left_margin, " |");
-        }
-    }
-}
-
-void render_index(struct section **sections, size_t n_sections) {
-    size_t max_len = 0;
-    int i;
-    for (i=0; i<n_sections; i++) {
-        size_t title_len = strlen(sections[i]->title);
-        if (title_len > max_len) {
-            max_len = title_len;
-        }
-    }
-    for (i=0; i<n_sections; i++) {
-        size_t title_len = strlen(sections[i]->title);
-        mvprintw(i+1, index_left_margin+max_len-title_len, "%s", sections[i]->title);
-    }
-    separator_left_margin = index_left_margin+max_len+1;
-    index_n_items = i-1;
 }
 
 void free_lines(struct line *lines) {
@@ -267,21 +225,28 @@ struct line *flow_content(struct line *lines, int width) {
     return rv_head;
 }
 
-void render_content(WINDOW *window, struct line *lines) {
-    int cursor_y = 0;
-    struct line *iter = lines;
-    while (iter) {
-        mvwprintw(window, cursor_y, 0, "%s", iter->line);
-        cursor_y++;
-        iter = iter->next;
+size_t get_index_width(struct section **sections, size_t n_sections) {
+    size_t max_len = 0;
+    size_t i;
+    for (i=0; i<n_sections; i++) {
+        size_t title_len = strlen(sections[i]->title);
+        if (title_len > max_len) {
+            max_len = title_len;
+        }
     }
+    return max_len;
 }
 
 /*
+ * NOTE:
+ *   scrollok(window, 0) needs to be called every time before
+ *   doing mvwprintw to avoid forced scroll caused by the
+ *   cursor possibly reacing the end of screen, and scrollok(window, 1)
+ *   needs to be called after the mvwprintw call.
  * TODO:
  *   - WINCH
  *   - scroll file list
- *   - figure out why scrolling fails over telnet ?
+ *   - figure out why scrolling fails over telnet (SOMETIMES????) ?
  *   - error handling everywhere
  */
 int main(int argc, char **argv) {
@@ -289,6 +254,10 @@ int main(int argc, char **argv) {
     int scroll = 0;
     size_t n_sections;
     DIR *dir = opendir(argv[1]);
+    if (dir == NULL) {
+        perror("opendir");
+        exit(1);
+    }
     struct section **sections = read_sections(dir, argv[1], 1, &n_sections);
     closedir(dir);
     FILE *fp = fopen(sections[selected_index]->filename, "r");
@@ -298,22 +267,36 @@ int main(int argc, char **argv) {
     raw();
     noecho();
     curs_set(0);
-    render_index(sections, n_sections);
-    render_separator(n_sections+2, selected_index);
-    WINDOW *content_win;
+    int index_left_margin = 2;
+    int index_rows = LINES;
+    int index_cols = get_index_width(sections, n_sections);
+    int index_scroll = 0;
+    int index_scroll_threshold = 5;
+    int separator_cols = strlen(SEPARATOR_SELECTED);
+    int separator_rows = LINES;
+    int separator_left_margin = index_left_margin + index_cols;
+    int content_left_margin = index_left_margin + index_cols + separator_cols;
+    int content_right_margin = 8;
     int content_rows = LINES;
-    int content_cols = COLS-separator_left_margin-4-content_right_margin;
-    content_win = newwin(content_rows, content_cols, 0, separator_left_margin+4);
-    scrollok(content_win, 1);
-    wsetscrreg(content_win, 0, LINES-1);
-    struct line *content = flow_content(sections[selected_index]->content, content_cols);
-    struct line *content_top = content;
-    struct line *content_bot = content;
+    int content_cols = COLS - content_left_margin - content_right_margin;
+    WINDOW *index_win = newwin(index_rows, index_cols, 0, index_left_margin);
+    WINDOW *separator_win = newwin(separator_rows, separator_cols, 0, separator_left_margin);
+    WINDOW *content_win = newwin(content_rows, content_cols, 0, content_left_margin);
+    struct line *content_head = flow_content(sections[selected_index]->content, content_cols);
+    struct line *content_top = content_head;
+    struct line *content_bot = content_head;
     for (int i=0; i<content_rows-1 && content_bot->next != NULL; i++) {
         content_bot = content_bot->next;
     }
-    render_content(content_win, content);
+    render_index(index_win, sections, n_sections);
+    render_separator(separator_win, selected_index+1);
+    render_content(content_win, content_head);
+    make_scrollable(index_win);
+    make_scrollable(separator_win);
+    make_scrollable(content_win);
     refresh();
+    wrefresh(index_win);
+    wrefresh(separator_win);
     wrefresh(content_win);
     int ch = getch();
     while (ch != 'q') {
@@ -330,16 +313,24 @@ int main(int argc, char **argv) {
                         sections[selected_index]->content = read_lines(fp);
                         fclose(fp);
                     }
-                    render_separator(n_sections+2, selected_index);
                     wclear(content_win);
-                    free_lines(content);
-                    content = flow_content(sections[selected_index]->content, content_cols);
-                    content_top = content;
-                    content_bot = content;
+                    free_lines(content_head);
+                    content_head = flow_content(sections[selected_index]->content, content_cols);
+                    content_top = content_head;
+                    content_bot = content_head;
                     for (int i=0; i<content_rows-1 && content_bot->next != NULL; i++) {
                         content_bot = content_bot->next;
                     }
-                    render_content(content_win, content);
+                    render_content(content_win, content_head);
+
+                    if (selected_index + index_scroll_threshold - index_scroll >= index_rows &&
+                            index_scroll + index_rows - 1 <= n_sections ) {
+                        index_scroll++;
+                        scroll_index(index_win, sections, n_sections, index_scroll, 1);
+                    } else {
+                        scroll_separator(separator_win, 1);
+                    }
+
                     refresh();
                     wrefresh(content_win);
                 }
@@ -356,60 +347,39 @@ int main(int argc, char **argv) {
                         sections[selected_index]->content = read_lines(fp);
                         fclose(fp);
                     }
-                    render_separator(n_sections+2, selected_index);
                     wclear(content_win);
-                    free_lines(content);
-                    content = flow_content(sections[selected_index]->content, content_cols);
-                    content_top = content;
-                    content_bot = content;
+                    free_lines(content_head);
+                    content_head = flow_content(sections[selected_index]->content, content_cols);
+                    content_top = content_head;
+                    content_bot = content_head;
                     for (int i=0; i<content_rows-1 && content_bot->next != NULL; i++) {
                         content_bot = content_bot->next;
                     }
-                    render_content(content_win, content);
+
+                    if (selected_index-index_scroll-index_scroll_threshold <= 0 &&
+                            index_scroll > 0) {
+                        index_scroll--;
+                        scroll_index(index_win, sections, n_sections, index_scroll, -1);
+                    } else {
+                        scroll_separator(separator_win, -1);
+                    }
+
+                    render_content(content_win, content_head);
                     refresh();
                     wrefresh(content_win);
                 }
                 break;
             case 'j':
-                if (content_bot->next != NULL) {
-                    wscrl(content_win, 1);
-                    content_top = content_top->next;
-                    content_bot = content_bot->next;
-                    mvwprintw(content_win, content_rows-1, 0, "%s", content_bot->line);
-                    wrefresh(content_win);
-                }
+                scroll_content(content_win, &content_top, &content_bot, 1);
                 break;
             case 'k':
-                if (content_top->prev != NULL) {
-                    wscrl(content_win, -1);
-                    content_top = content_top->prev;
-                    content_bot = content_bot->prev;
-                    mvwprintw(content_win, 0, 0, "%s", content_top->line);
-                    wrefresh(content_win);
-                }
+                scroll_content(content_win, &content_top, &content_bot, -1);
                 break;
             case 'g':
-                if (content_top->prev != NULL) {
-                    content_top = content;
-                    content_bot = content;
-                    for (int i=0; i<content_rows-1 && content_bot->next != NULL; i++) {
-                        content_bot = content_bot->next;
-                    }
-                    wclear(content_win);
-                    render_content(content_win, content);
-                    wrefresh(content_win);
-                }
+                top_content(content_win, &content_top, &content_bot);
                 break;
             case 'G':
-                if (content_bot->next != NULL) {
-                    while (content_bot->next != NULL) {
-                        content_top = content_top->next;
-                        content_bot = content_bot->next;
-                    }
-                    wclear(content_win);
-                    render_content(content_win, content_top);
-                    wrefresh(content_win);
-                }
+                bot_content(content_win, &content_top, &content_bot);
                 break;
             default:
                 break;
@@ -418,6 +388,6 @@ int main(int argc, char **argv) {
     }
     delwin(content_win);
     endwin();
-    free_lines(content);
+    free_lines(content_head);
     return 0;
 }
