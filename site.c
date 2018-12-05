@@ -187,12 +187,20 @@ void free_lines(struct line *lines) {
  *   - a bug that will SIGSEGV this
  *     program if a contigous word is
  *     longer than `width`
+ *   - it also adds a leading and
+ *     trailing \n for style purposes
  */
 struct line *flow_content(struct line *lines, int width) {
     struct line *rv_head = malloc(sizeof(struct line));
     struct line *rv_iter = rv_head;
     struct line *rv_prev = NULL;
     rv_iter->prev = NULL;
+    rv_iter->line = strcpy(malloc(sizeof(char)), ""); /* this may seem stupid but is needed for
+                                                         consistency when using free() */
+    rv_iter->next = malloc(sizeof(struct line));
+    rv_prev = rv_iter;
+    rv_iter = rv_iter->next;
+    rv_iter->prev = rv_prev;
     struct line *iter = lines;
     while (iter) {
         char *head = iter->line;
@@ -254,8 +262,8 @@ struct line *flow_content(struct line *lines, int width) {
         rv_iter->prev = rv_prev;
         iter = iter->next;
     }
-    free(rv_prev->next);
-    rv_prev->next = NULL;
+    rv_iter->line = strcpy(malloc(sizeof(char)), "");
+    rv_iter->next = NULL;
     return rv_head;
 }
 
