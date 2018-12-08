@@ -1,0 +1,11 @@
+TODO
+====
+
+  - figure out how to get rid of the wrapper script or
+    add one to the distribution
+  - pretty up the rendering/scrolling code
+  - add directory support
+  - add WINCH support (idk if it even transfers over telnet)
+  - maybe add file caching
+  - maybe add inotify support for live directory indexing
+  - add a way to do animations (either via frames or executable load)

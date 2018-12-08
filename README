@@ -16,9 +16,15 @@ The syntax is described in the FORMATTING section.
   Both the text window as well as the file index window are scrollable.
 
 BUILDING
----------
+--------
 
-  gcc -lncurses site.c scroll.c render.c data.c
+  If you have autotools, you can just run
+    ./autogen.sh
+and then do the normal `./configure && make && make install` with your favourite
+flags.
+
+  Otherwise, you can run
+    gcc -o telnetsite -lncurses ./src/*.c
 
 SERVING OVER TELNET
 -------------------
@@ -40,9 +46,9 @@ mytelnetsite stream tcp nowait <user> /usr/sbin/tcpd /usr/sbin/telnetd -h -E <pa
 with the following:
 
 #!/bin/sh
-exec <path-to-a.out> <path-to-site.d>
+exec <path-to-binary> <path-to-site.d>
 
-  where <path-to-a.out> is the path to the telnet-site executable, and
+  where <path-to-binary> is the path to the telnet-site executable, and
 <path-to-site.d> is the path to the root directory of the site.
 
 FORMATTING
@@ -71,3 +77,9 @@ will be aligned to the first letter character on this line, for example:
      item
      number
      one
+
+BUGS
+----
+
+  - sometimes scrolling breaks over telnet or seems to assume invalid terminal size
+  - flow algo segfaults if a contiguos word is longer that the paragraph max width
