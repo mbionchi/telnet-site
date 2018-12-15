@@ -25,6 +25,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 size_t get_index_width(struct section **sections, size_t n_sections) {
     size_t max_len = 0;
@@ -36,6 +37,9 @@ size_t get_index_width(struct section **sections, size_t n_sections) {
         }
     }
     return max_len;
+}
+
+void winch_handler(int signo) {
 }
 
 /*
@@ -51,6 +55,7 @@ size_t get_index_width(struct section **sections, size_t n_sections) {
  *   - error handling everywhere
  */
 int main(int argc, char **argv) {
+    signal(SIGWINCH, winch_handler);
     int selected_index = 0;
     int scroll = 0;
     size_t n_sections;
@@ -89,12 +94,12 @@ int main(int argc, char **argv) {
     for (int i=0; i<content_rows-1 && content_bot->next != NULL; i++) {
         content_bot = content_bot->next;
     }
-    render_index(index_win, sections, n_sections);
-    render_separator(separator_win, selected_index+1);
-    render_content(content_win, content_head);
     make_scrollable(index_win);
     make_scrollable(separator_win);
     make_scrollable(content_win);
+    render_index(index_win, sections, n_sections);
+    render_separator(separator_win, selected_index+1);
+    render_content(content_win, content_head);
     refresh();
     wrefresh(index_win);
     wrefresh(separator_win);

@@ -35,6 +35,7 @@ struct section {
 void print_lines(struct line *lines);
 void dump_sections(struct section **sections, size_t n_sections);
 struct line *read_lines(FILE *fp);
+struct frame *read_frames(FILE *fp);
 struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t *nmemb);
 struct line *flow_content(struct line *lines, int width);
 void free_lines(struct line *lines);

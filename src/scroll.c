@@ -15,6 +15,7 @@
  *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "log.h"
 #include "scroll.h"
 #include "render.h"
 #include "data.h"

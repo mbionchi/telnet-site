@@ -1,3 +1,20 @@
+/*
+ *   This file is part of telnet-site.
+ *
+ *   telnet-site is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   telnet-site is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "data.h"
 #include <stdlib.h>
 #include <stddef.h>
@@ -89,9 +106,11 @@ struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t
                     base = realloc(base, *nmemb*sizeof(struct section*));
                 }
                 base[i] = malloc(sizeof(struct section));
-                char *title = index(dirent->d_name, '-')+1;
+                char *title = index(dirent->d_name, '-');
                 if (!title) {
                     title = dirent->d_name;
+                } else {
+                    title++;
                 }
                 size_t title_len = strlen(title);
                 base[i]->title = strcpy(malloc((title_len+1)*sizeof(char)), title);
