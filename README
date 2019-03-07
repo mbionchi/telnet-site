@@ -1,6 +1,7 @@
 TELNET-SITE
 ===========
 
+
 DESCRIPTION
 -----------
 
@@ -13,7 +14,11 @@ that is the root of the site and contains text files to be displayed.
 allow telnet-site to do things such as flowing paragraphs and indenting list items.
 The syntax is described in the FORMATTING section.
 
+  Furthermore, the text files can specify animations, as described in the
+ANIMATIONS section.
+
   Both the text window as well as the file index window are scrollable.
+
 
 BUILDING
 --------
@@ -25,6 +30,7 @@ flags.
 
   Otherwise, you can run
     gcc -o telnetsite -lncurses ./src/*.c
+
 
 SERVING OVER TELNET
 -------------------
@@ -50,6 +56,7 @@ exec <path-to-binary> <path-to-site.d>
 
   where <path-to-binary> is the path to the telnet-site executable, and
 <path-to-site.d> is the path to the root directory of the site.
+
 
 FORMATTING
 ----------
@@ -78,8 +85,33 @@ will be aligned to the first letter character on this line, for example:
      number
      one
 
+
+ANIMATIONS
+----------
+
+  Animation specification must start with a ;anim on the line by
+itself and end with either ;loop or ;noloop on the line by itself.
+In between those two lines, it is expected that the user will specify
+frames by using the keyword ;frame followed by the number of ticks this
+frame should last (where one tick is 1/10th a second), all on one line
+with nothing else on it.  On the next line, and until the next ;frame,
+the lines will be treated as frame data.  The number of lines must be
+the same among all frames.
+
+  For example, here's a specification of a loading spinner:
+
+;anim
+;frame 1
+loading... |
+;frame 1
+loading... /
+;frame 1
+loading... -
+;frame 1
+loading... \
+;loop
+
 BUGS
 ----
 
-  - sometimes scrolling breaks over telnet or seems to assume invalid terminal size
-  - flow algo segfaults if a contiguos word is longer that the paragraph max width
+  You know it.
