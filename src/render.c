@@ -15,9 +15,12 @@
  *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "log.h"
 #include "render.h"
+
+#include "anim.h"
+#include "log.h"
 #include "data.h"
+#include "site.h"
 #include <string.h>
 #include <ncurses.h>
 
@@ -52,6 +55,32 @@ void render_content(WINDOW *window, struct line *lines) {
         mvwprintw(window, cursor_y, 0, "%s", iter->line);
         cursor_y++;
         iter = iter->next;
+    }
+    scrollok(window, 1);
+}
+
+// =========================
+
+void render_ncontent(struct window *window) {
+    size_t cursor_y = 0,
+           i = 0;
+    while (i < window->content.n_formatted && cursor_y < window->rows) {
+        render_nline(window->window, cursor_y, window->content.formatted[i]);
+        if (window->content.formatted[i]->type == ANIM &&
+                window->content.formatted[i]->anim->is_first_line) {
+            push_anim_ref_back(window, i);
+        }
+        i++;
+        cursor_y++;
+    }
+}
+
+void render_nline(WINDOW *window, size_t cursor_y, struct nline *nline) {
+    scrollok(window, 0);
+    if (nline->type == TEXT) {
+        mvwprintw(window, cursor_y, 0, "%s", nline->text->data);
+    } else if (nline->type == ANIM) {
+        mvwprintw(window, cursor_y, 0, nline->anim->frames[nline->anim->current_frame_index].s->data);
     }
     scrollok(window, 1);
 }

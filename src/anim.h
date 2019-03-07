@@ -15,19 +15,15 @@
  *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef _TELNET_SITE_SCROLL_H
-#define _TELNET_SITE_SCROLL_H
+#ifndef _TELNET_SITE_ANIM_H
+#define _TELNET_SITE_ANIM_H
 
 #include "data.h"
-#include <ncurses.h>
 
-void make_scrollable(WINDOW *window);
-void scroll_content(WINDOW *window, struct line **content_top, struct line **content_bot, int dy);
-void top_content(WINDOW *window, struct line **content_top, struct line **content_bot);
-void bot_content(WINDOW *window, struct line **content_top, struct line **content_bot);
-void scroll_index(WINDOW *window, struct section **sections, size_t n_sections, int index_scroll, int dy);
-void scroll_separator(WINDOW *window, int dy);
-
-void scroll_ncontent(struct window *window, int dy);
+void anim_tick(struct window *window);
+void push_anim_ref_front(struct window *window, size_t index);
+void push_anim_ref_back(struct window *window, size_t index);
+void pop_anim_ref_front(struct window *window);
+void pop_anim_ref_back(struct window *window);
 
 #endif

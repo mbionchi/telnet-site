@@ -15,19 +15,24 @@
  *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef _TELNET_SITE_SCROLL_H
-#define _TELNET_SITE_SCROLL_H
+#include "log.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 
-#include "data.h"
-#include <ncurses.h>
+#define LOGPATH "/tmp/telnetsite"
 
-void make_scrollable(WINDOW *window);
-void scroll_content(WINDOW *window, struct line **content_top, struct line **content_bot, int dy);
-void top_content(WINDOW *window, struct line **content_top, struct line **content_bot);
-void bot_content(WINDOW *window, struct line **content_top, struct line **content_bot);
-void scroll_index(WINDOW *window, struct section **sections, size_t n_sections, int index_scroll, int dy);
-void scroll_separator(WINDOW *window, int dy);
+void errlog(char *fmt, ...) {
+    static FILE *fp = NULL;
+    if (fp == NULL) {
+        fp = fopen(LOGPATH, "a");
+    }
+    if (fp != NULL) {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(fp, fmt, args);
+        fflush(fp);
+        va_end(args);
+    }
+}
 
-void scroll_ncontent(struct window *window, int dy);
-
-#endif
