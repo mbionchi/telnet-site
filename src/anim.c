@@ -21,6 +21,16 @@
 #include <stdlib.h>
 #include <stddef.h>
 
+void free_anim_refs(struct window *window) {
+    struct anim_ref *iter = window->content.anim_refs;
+    while (iter != NULL) {
+        struct anim_ref *tmp = iter;
+        iter = iter->next;
+        free(tmp);
+    }
+    window->content.anim_refs = NULL;
+}
+
 void pop_anim_ref_front(struct window *window) {
     struct anim_ref *old = window->content.anim_refs;
     if (old != NULL) {

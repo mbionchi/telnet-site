@@ -25,5 +25,6 @@ void push_anim_ref_front(struct window *window, size_t index);
 void push_anim_ref_back(struct window *window, size_t index);
 void pop_anim_ref_front(struct window *window);
 void pop_anim_ref_back(struct window *window);
+void free_anim_refs(struct window *window);
 
 #endif

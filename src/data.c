@@ -191,11 +191,20 @@ struct line *flow_content(struct line *lines, int width) {
 // ======== new stuff:
 // big todo: errcheck mallocs, strncpys, getlines
 
+struct nline *mkblank() {
+    struct nline *blank = malloc(sizeof(struct nline));
+    blank->type = TEXT;
+    blank->text = malloc(sizeof(struct string));
+    blank->text->len = 0;
+    blank->text->data = strcpy(malloc(1*sizeof(char)), "");
+    return blank;
+}
+
 size_t read_nlines(FILE *fp, struct nline ***nlines) {
     size_t n_raw = 0;
     size_t nmemb = 8,
            linear_step = 8;
-    *nlines = malloc(nmemb*sizeof(struct nline**));
+    *nlines = malloc(nmemb*sizeof(struct nline*));
     char *line = NULL,
          *full_line = NULL;
     size_t line_buf_len = 0,
@@ -321,13 +330,8 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
     size_t nmemb = 8,
            linear_step = 8;
     size_t i = 0;
-    *to = malloc(nmemb*sizeof(struct nline**));
-    struct nline *blank = malloc(sizeof(struct nline));
-    blank->type = TEXT;
-    blank->text = malloc(sizeof(struct string));
-    blank->text->len = 0;
-    blank->text->data = strcpy(malloc(1*sizeof(char)), "");
-    (*to)[n_to] = blank;
+    *to = malloc(nmemb*sizeof(struct nline*));
+    (*to)[n_to] = mkblank();
     n_to++;
     while (i < n_from) {
         if (from[i]->type == TEXT) {
@@ -435,32 +439,64 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
         nmemb++;
         *to = realloc(*to, nmemb*sizeof(struct nline*));
     }
-    struct nline *blank2 = malloc(sizeof(struct nline));
-    blank2->type = TEXT;
-    blank2->text = malloc(sizeof(struct string));
-    blank2->text->len = 0;
-    blank2->text->data = strcpy(malloc(1*sizeof(char)), "");
-    (*to)[n_to] = blank2;
+    (*to)[n_to] = mkblank();
     n_to++;
     return n_to;
 }
 
-void free_nlines(struct nline **nlines, size_t nmemb) {
+size_t gen_index(struct section **sections, size_t nmemb, struct nline ***to, size_t width) {
+    *to = malloc((nmemb+2)*sizeof(struct nline*));
+    (*to)[0] = mkblank();
     for (size_t i = 0; i < nmemb; i++) {
-        if (nlines[i]->type == TEXT) {
-            free(nlines[i]->text->data);
-            free(nlines[i]->text);
-        } else if (nlines[i]->type == ANIM) {
-            for (size_t j = 0; j < nlines[i]->anim->n_frames; j++) {
-                free(nlines[i]->anim->frames[j].s->data);
-                free(nlines[i]->anim->frames[j].s);
-            }
-            free(nlines[i]->anim->frames);
-            free(nlines[i]->anim);
+        struct string *s = malloc(sizeof(struct string));
+        s->data = malloc((width+1)*sizeof(char));
+        s->len = width;
+        size_t j = 0;
+        size_t title_len = strlen(sections[i]->title);
+        while (j < width-title_len) {
+            s->data[j] = ' ';
+            j++;
         }
-        free(nlines[i]);
+        strncpy(s->data+j, sections[i]->title, width-j);
+        s->data[s->len] = '\0';
+        struct nline *nline = malloc(sizeof(struct nline));
+        nline->type = TEXT;
+        nline->text = s;
+        (*to)[i+1] = nline;
     }
-    free(nlines);
+    (*to)[nmemb+1] = mkblank();
+    return nmemb+2;
+}
+
+void free_nlines(struct nline **nlines, size_t nmemb) {
+    if (nlines != NULL) {
+        for (size_t i = 0; i < nmemb; i++) {
+            if (nlines[i]->type == TEXT) {
+                free(nlines[i]->text->data);
+                free(nlines[i]->text);
+            } else if (nlines[i]->type == ANIM) {
+                for (size_t j = 0; j < nlines[i]->anim->n_frames; j++) {
+                    free(nlines[i]->anim->frames[j].s->data);
+                    free(nlines[i]->anim->frames[j].s);
+                }
+                free(nlines[i]->anim->frames);
+                free(nlines[i]->anim);
+            }
+            free(nlines[i]);
+        }
+        free(nlines);
+    }
+}
+
+void free_content(struct window *window) {
+    if (window->content.raw != NULL) {
+        free_nlines(window->content.raw, window->content.n_raw);
+        window->content.raw = NULL;
+    }
+    if (window->content.formatted != NULL) {
+        free_nlines(window->content.formatted, window->content.n_formatted);
+        window->content.formatted = NULL;
+    }
 }
 
 /*

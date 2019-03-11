@@ -24,17 +24,6 @@
 #include <string.h>
 #include <ncurses.h>
 
-void render_index(WINDOW *window, struct section **sections, size_t n_sections) {
-    int maxx, maxy;
-    getmaxyx(window, maxy, maxx);
-    scrollok(window, 0);
-    for (size_t i=0; i<n_sections && i<maxy-1; i++) {
-        size_t title_len = strlen(sections[i]->title);
-        mvwprintw(window, i+1, maxx-title_len, "%s", sections[i]->title);
-    }
-    scrollok(window, 1);
-}
-
 void render_separator(WINDOW *window, int selected_index) {
     int maxx, maxy;
     getmaxyx(window, maxy, maxx);
@@ -45,25 +34,11 @@ void render_separator(WINDOW *window, int selected_index) {
     scrollok(window, 1);
 }
 
-void render_content(WINDOW *window, struct line *lines) {
-    int maxx, maxy;
-    getmaxyx(window, maxy, maxx);
-    scrollok(window, 0);
-    int cursor_y = 0;
-    struct line *iter = lines;
-    while (iter && cursor_y < maxy) {
-        mvwprintw(window, cursor_y, 0, "%s", iter->line);
-        cursor_y++;
-        iter = iter->next;
-    }
-    scrollok(window, 1);
-}
-
 // =========================
 
 void render_ncontent(struct window *window) {
     size_t cursor_y = 0,
-           i = 0;
+           i = window->scroll;
     while (i < window->content.n_formatted && cursor_y < window->rows) {
         render_nline(window->window, cursor_y, window->content.formatted[i]);
         if (window->content.formatted[i]->type == ANIM &&

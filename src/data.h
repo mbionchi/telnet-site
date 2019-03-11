@@ -87,6 +87,8 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
 void print_nlines(struct nline **nlines, size_t nmemb);
 void free_nlines(struct nline **nlines, size_t nmemb);
 
+size_t gen_index(struct section **sections, size_t nmemb, struct nline ***to, size_t width);
+
 #define ANIM_HINT ";anim"
 #define FRAME_HINT ";frame"
 #define LOOP_HINT ";loop"
@@ -99,5 +101,6 @@ void dump_sections(struct section **sections, size_t n_sections);
 struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t *nmemb);
 struct line *flow_content(struct line *lines, int width);
 void free_lines(struct line *lines);
+void free_content(struct window *window);
 
 #endif

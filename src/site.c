@@ -45,14 +45,10 @@ size_t get_index_width(struct section **sections, size_t n_sections) {
     return max_len;
 }
 
-struct window index_window;
-struct window separator_window;
-struct window content_window;
-
 sig_atomic_t had_winch = 0;
+int reload_content = 0;
 
 void winch_handler(int signo) {
-    fprintf(stderr, "winch\n");
     had_winch = 1;
 }
 
@@ -71,20 +67,9 @@ void winch_handler(int signo) {
 int site(int argc, char **argv) {
     signal(SIGWINCH, winch_handler);
 
-//=================
-/*
-    FILE *fp1 = fopen(argv[1], "r");
-    struct content c;
-    c.n_raw = read_nlines(fp1, &c.raw);
-    fclose(fp1);
-    c.n_formatted = flow_nlines(c.raw, c.n_raw, &c.formatted, 60);
-    print_nlines(c.raw, c.n_raw);
-    free_nlines(c.raw, c.n_raw);
-    fprintf(stderr, "===========================================\n");
-    print_nlines(c.formatted, c.n_formatted);
-    exit(0);
-*/
-//=================
+    struct window index_window;
+    struct window separator_window;
+    struct window content_window;
 
     int selected_index = 0;
     int scroll = 0;
@@ -98,7 +83,6 @@ int site(int argc, char **argv) {
     closedir(dir);
     FILE *fp = fopen(sections[selected_index]->filename, "r");
     content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
-//    sections[selected_index]->content = read_lines(fp);
     fclose(fp);
     initscr();
     cbreak();
@@ -106,17 +90,28 @@ int site(int argc, char **argv) {
     noecho();
     curs_set(0);
     int index_left_margin = 2;
-    int index_rows = LINES;
     int index_cols = get_index_width(sections, n_sections);
-    int index_scroll = 0;
     int index_scroll_threshold = 5;
+
     int separator_cols = strlen(SEPARATOR_SELECTED);
     int separator_rows = LINES;
     int separator_left_margin = index_left_margin + index_cols;
+
     int content_left_margin = index_left_margin + index_cols + separator_cols;
     int content_right_margin = 8;
-    WINDOW *index_win = newwin(index_rows, index_cols, 0, index_left_margin);
+
     WINDOW *separator_win = newwin(separator_rows, separator_cols, 0, separator_left_margin);
+
+    index_window.cols = get_index_width(sections, n_sections);
+    index_window.rows = LINES;
+    index_window.scroll = 0;
+    index_window.window = newwin(index_window.rows, index_window.cols, 0, index_left_margin);
+
+    index_window.content.anim_refs = NULL;
+    index_window.content.n_formatted = gen_index(sections,
+                                                 n_sections,
+                                                 &index_window.content.formatted,
+                                                 index_window.cols);
 
     content_window.cols = COLS - content_left_margin - content_right_margin;
     content_window.rows = LINES;
@@ -129,14 +124,16 @@ int site(int argc, char **argv) {
                                                      &content_window.content.formatted,
                                                      content_window.cols);
 
-    make_scrollable(index_win);
+    make_scrollable(index_window.window);
     make_scrollable(separator_win);
     make_scrollable(content_window.window);
-    render_index(index_win, sections, n_sections);
+
+    render_ncontent(&index_window);
     render_separator(separator_win, selected_index+1);
     render_ncontent(&content_window);
+
     refresh();
-    wrefresh(index_win);
+    wrefresh(index_window.window);
     wrefresh(separator_win);
     wrefresh(content_window.window);
 
@@ -145,111 +142,127 @@ int site(int argc, char **argv) {
         switch(ch) {
             case 'J':
                 if (selected_index < n_sections-1) {
-                    if (content_window.content.raw != NULL) {
-                        free_nlines(content_window.content.raw, content_window.content.n_raw);
-                        content_window.content.raw = NULL;
-                    }
-                    if (content_window.content.formatted != NULL) {
-                        free_nlines(content_window.content.formatted, content_window.content.n_formatted);
-                        content_window.content.formatted = NULL;
-                    }
                     selected_index++;
-                    if (content_window.content.raw == NULL) {
-                        FILE *fp = fopen(sections[selected_index]->filename, "r");
-                        content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
-                        fclose(fp);
-                    }
-                    if (content_window.content.formatted == NULL) {
-                        content_window.content.n_formatted = flow_nlines(content_window.content.raw,
-                                                                         content_window.content.n_raw,
-                                                                         &content_window.content.formatted,
-                                                                         content_window.cols);
-                    }
-                    wclear(content_window.window);
-                    render_ncontent(&content_window);
-
-                    if (selected_index + index_scroll_threshold - index_scroll >= index_rows &&
-                            index_scroll + index_rows - 1 <= n_sections ) {
-                        index_scroll++;
-                        scroll_index(index_win, sections, n_sections, index_scroll, 1);
+                    reload_content = 1;
+                    if (selected_index + index_scroll_threshold - index_window.scroll >= index_window.rows &&
+                            index_window.scroll + index_window.rows - 1 <= n_sections ) {
+                        scroll_ncontent(&index_window, 1);
                     } else {
                         scroll_separator(separator_win, 1);
                     }
-
-                    refresh();
-                    wrefresh(content_window.window);
                 }
                 break;
-
-/*
             case 'K':
                 if (selected_index > 0) {
-                    if (sections[selected_index]->content != NULL) {
-                        free_lines(sections[selected_index]->content);
-                        sections[selected_index]->content = NULL;
-                    }
                     selected_index--;
-                    if (sections[selected_index]->content == NULL) {
-                        FILE *fp = fopen(sections[selected_index]->filename, "r");
-                        sections[selected_index]->content = read_lines(fp);
-                        fclose(fp);
-                    }
-                    wclear(content_win);
-                    free_lines(content_head);
-                    content_head = flow_content(sections[selected_index]->content, content_cols);
-                    content_top = content_head;
-                    content_bot = content_head;
-                    for (int i=0; i<content_rows-1 && content_bot->next != NULL; i++) {
-                        content_bot = content_bot->next;
-                    }
-
-                    if (selected_index-index_scroll-index_scroll_threshold <= 0 &&
-                            index_scroll > 0) {
-                        index_scroll--;
-                        scroll_index(index_win, sections, n_sections, index_scroll, -1);
+                    reload_content = 1;
+                    if (selected_index-index_window.scroll-index_scroll_threshold <= 0 &&
+                            index_window.scroll > 0) {
+                        scroll_ncontent(&index_window, -1);
                     } else {
                         scroll_separator(separator_win, -1);
                     }
-
-                    render_content(content_win, content_head);
-                    refresh();
-                    wrefresh(content_win);
                 }
                 break;
-*/
-
             case 'j':
                 scroll_ncontent(&content_window, 1);
                 break;
             case 'k':
                 scroll_ncontent(&content_window, -1);
                 break;
-
-/*
             case 'g':
-                top_content(content_win, &content_top, &content_bot);
+                if (content_window.scroll > 0) {
+                    wclear(content_window.window);
+                    content_window.scroll = 0;
+                    render_ncontent(&content_window);
+                    wrefresh(content_window.window);
+                }
                 break;
             case 'G':
-                bot_content(content_win, &content_top, &content_bot);
+                if (content_window.content.n_formatted > content_window.rows) {
+                    wclear(content_window.window);
+                    content_window.scroll = content_window.content.n_formatted-content_window.rows;
+                    render_ncontent(&content_window);
+                    wrefresh(content_window.window);
+                }
                 break;
-*/
-
             case ERR:
                 anim_tick(&content_window);
-                /*
-                 * check for:
-                 *   - animation updates
-                 *   - window redraw
-                 */
+                if (had_winch) {
+                    free_nlines(content_window.content.formatted, content_window.content.n_formatted);
+
+                    delwin(index_window.window);
+                    delwin(separator_win);
+                    delwin(content_window.window);
+                    endwin();
+
+                    refresh();
+
+                    index_window.rows = LINES;
+                    index_window.window = newwin(index_window.rows, index_window.cols, 0, index_left_margin);
+
+                    separator_rows = LINES;
+                    separator_win = newwin(separator_rows, separator_cols, 0, separator_left_margin);
+
+                    content_window.cols = COLS - content_left_margin - content_right_margin;
+                    content_window.rows = LINES;
+                    content_window.scroll = 0;
+                    content_window.window = newwin(content_window.rows, content_window.cols, 0, content_left_margin);
+
+                    content_window.content.n_formatted =
+                        flow_nlines(content_window.content.raw,
+                                    content_window.content.n_raw,
+                                    &content_window.content.formatted,
+                                    content_window.cols);
+
+                    make_scrollable(index_window.window);
+                    make_scrollable(separator_win);
+                    make_scrollable(content_window.window);
+
+                    render_ncontent(&index_window);
+                    render_separator(separator_win, selected_index+1);
+                    render_ncontent(&content_window);
+
+                    refresh();
+
+                    wrefresh(index_window.window);
+                    wrefresh(separator_win);
+                    wrefresh(content_window.window);
+
+                    had_winch = 0;
+                }
+                if (reload_content) {
+                    free_content(&content_window);
+                    free_anim_refs(&content_window);
+
+                    FILE *fp = fopen(sections[selected_index]->filename, "r");
+                    content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
+                    fclose(fp);
+
+                    content_window.content.n_formatted =
+                        flow_nlines(content_window.content.raw,
+                                    content_window.content.n_raw,
+                                    &content_window.content.formatted,
+                                    content_window.cols);
+                    content_window.scroll = 0;
+
+                    wclear(content_window.window);
+                    render_ncontent(&content_window);
+                    wrefresh(content_window.window);
+
+                    reload_content = 0;
+                }
                 break;
             default:
                 break;
         }
         ch = getch();
     }
-    delwin(content_window.window);
-    delwin(index_win);
+    free_content(&content_window);
+    free_anim_refs(&content_window);
+    delwin(index_window.window);
     delwin(separator_win);
+    delwin(content_window.window);
     endwin();
     return 0;
 }
