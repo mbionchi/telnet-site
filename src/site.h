@@ -18,9 +18,6 @@
 #ifndef _TELNET_SITE_SITE_H
 #define _TELNET_SITE_SITE_H
 
-#include <unistd.h>
-#include <stddef.h>
-
 int site(int argc, char **argv);
 
 #endif

@@ -22,8 +22,8 @@
 #include <ncurses.h>
 
 void make_scrollable(WINDOW *window);
-void scroll_separator(WINDOW *window, int dy);
 
+void scroll_separator(struct window *window, int dy);
 void scroll_ncontent(struct window *window, int dy);
 
 #endif

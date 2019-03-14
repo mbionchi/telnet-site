@@ -21,6 +21,7 @@
 #include "render.h"
 #include "scroll.h"
 #include "data.h"
+#include <errno.h>
 #include <ncurses.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -59,13 +60,15 @@ void winch_handler(int signo) {
  *   cursor possibly reacing the end of screen, and scrollok(window, 1)
  *   needs to be called after the mvwprintw call.
  * TODO:
- *   - WINCH
- *   - scroll file list
- *   - figure out why scrolling fails over telnet (SOMETIMES????) ?
- *   - error handling everywhere
+ *   - error handling everywhere please
  */
 int site(int argc, char **argv) {
     signal(SIGWINCH, winch_handler);
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <path-to-site.d>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
     struct window index_window;
     struct window separator_window;
@@ -76,19 +79,25 @@ int site(int argc, char **argv) {
     size_t n_sections;
     DIR *dir = opendir(argv[1]);
     if (dir == NULL) {
-        perror("opendir");
+        fprintf(stderr, "[E] %s:%s:%u: %s: %s\n", argv[0], __FILE__, __LINE__, strerror(errno), argv[1]);
         exit(1);
     }
     struct section **sections = read_sections(dir, argv[1], 1, &n_sections);
     closedir(dir);
     FILE *fp = fopen(sections[selected_index]->filename, "r");
-    content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
-    fclose(fp);
+    if (fp != NULL) {
+        content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
+        fclose(fp);
+    } else {
+        fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", argv[0], __FILE__, __LINE__, strerror(errno), sections[selected_index]->filename);
+        content_window.content.n_raw = gen_err_opening(&content_window.content.raw);
+    }
     initscr();
     cbreak();
     halfdelay(1);
     noecho();
     curs_set(0);
+
     int index_left_margin = 2;
     int index_cols = get_index_width(sections, n_sections);
     int index_scroll_threshold = 5;
@@ -100,8 +109,6 @@ int site(int argc, char **argv) {
     int content_left_margin = index_left_margin + index_cols + separator_cols;
     int content_right_margin = 8;
 
-    WINDOW *separator_win = newwin(separator_rows, separator_cols, 0, separator_left_margin);
-
     index_window.cols = get_index_width(sections, n_sections);
     index_window.rows = LINES;
     index_window.scroll = 0;
@@ -112,6 +119,11 @@ int site(int argc, char **argv) {
                                                  n_sections,
                                                  &index_window.content.formatted,
                                                  index_window.cols);
+
+    separator_window.cols = strlen(SEPARATOR_SELECTED);
+    separator_window.rows = LINES;
+    separator_window.scroll = 1;
+    separator_window.window = newwin(separator_window.rows, separator_window.cols, 0, separator_left_margin);
 
     content_window.cols = COLS - content_left_margin - content_right_margin;
     content_window.rows = LINES;
@@ -125,16 +137,16 @@ int site(int argc, char **argv) {
                                                      content_window.cols);
 
     make_scrollable(index_window.window);
-    make_scrollable(separator_win);
+    make_scrollable(separator_window.window);
     make_scrollable(content_window.window);
 
     render_ncontent(&index_window);
-    render_separator(separator_win, selected_index+1);
+    render_separator(&separator_window);
     render_ncontent(&content_window);
 
     refresh();
     wrefresh(index_window.window);
-    wrefresh(separator_win);
+    wrefresh(separator_window.window);
     wrefresh(content_window.window);
 
     int ch = getch();
@@ -144,11 +156,11 @@ int site(int argc, char **argv) {
                 if (selected_index < n_sections-1) {
                     selected_index++;
                     reload_content = 1;
-                    if (selected_index + index_scroll_threshold - index_window.scroll >= index_window.rows &&
-                            index_window.scroll + index_window.rows - 1 <= n_sections ) {
-                        scroll_ncontent(&index_window, 1);
+                    if (separator_window.scroll + index_scroll_threshold < separator_window.rows ||
+                            index_window.content.n_formatted <= index_window.scroll + index_window.rows) {
+                        scroll_separator(&separator_window, 1);
                     } else {
-                        scroll_separator(separator_win, 1);
+                        scroll_ncontent(&index_window, 1);
                     }
                 }
                 break;
@@ -156,11 +168,11 @@ int site(int argc, char **argv) {
                 if (selected_index > 0) {
                     selected_index--;
                     reload_content = 1;
-                    if (selected_index-index_window.scroll-index_scroll_threshold <= 0 &&
-                            index_window.scroll > 0) {
-                        scroll_ncontent(&index_window, -1);
+                    if (separator_window.scroll >= index_scroll_threshold ||
+                            index_window.scroll == 0) {
+                        scroll_separator(&separator_window, -1);
                     } else {
-                        scroll_separator(separator_win, -1);
+                        scroll_ncontent(&index_window, -1);
                     }
                 }
                 break;
@@ -189,10 +201,9 @@ int site(int argc, char **argv) {
             case ERR:
                 anim_tick(&content_window);
                 if (had_winch) {
-                    free_nlines(content_window.content.formatted, content_window.content.n_formatted);
 
                     delwin(index_window.window);
-                    delwin(separator_win);
+                    delwin(separator_window.window);
                     delwin(content_window.window);
                     endwin();
 
@@ -201,13 +212,17 @@ int site(int argc, char **argv) {
                     index_window.rows = LINES;
                     index_window.window = newwin(index_window.rows, index_window.cols, 0, index_left_margin);
 
-                    separator_rows = LINES;
-                    separator_win = newwin(separator_rows, separator_cols, 0, separator_left_margin);
+                    separator_window.rows = LINES;
+                    separator_window.scroll = selected_index+1;
+                    separator_window.window = newwin(separator_window.rows, separator_window.cols, 0, separator_left_margin);
 
                     content_window.cols = COLS - content_left_margin - content_right_margin;
                     content_window.rows = LINES;
                     content_window.scroll = 0;
                     content_window.window = newwin(content_window.rows, content_window.cols, 0, content_left_margin);
+
+                    free_nlines(content_window.content.formatted, content_window.content.n_formatted);
+                    free_anim_refs(&content_window);
 
                     content_window.content.n_formatted =
                         flow_nlines(content_window.content.raw,
@@ -216,17 +231,17 @@ int site(int argc, char **argv) {
                                     content_window.cols);
 
                     make_scrollable(index_window.window);
-                    make_scrollable(separator_win);
+                    make_scrollable(separator_window.window);
                     make_scrollable(content_window.window);
 
                     render_ncontent(&index_window);
-                    render_separator(separator_win, selected_index+1);
+                    render_separator(&separator_window);
                     render_ncontent(&content_window);
 
                     refresh();
 
                     wrefresh(index_window.window);
-                    wrefresh(separator_win);
+                    wrefresh(separator_window.window);
                     wrefresh(content_window.window);
 
                     had_winch = 0;
@@ -236,8 +251,13 @@ int site(int argc, char **argv) {
                     free_anim_refs(&content_window);
 
                     FILE *fp = fopen(sections[selected_index]->filename, "r");
-                    content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
-                    fclose(fp);
+                    if (fp != NULL) {
+                        content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
+                        fclose(fp);
+                    } else {
+                        fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", argv[0], __FILE__, __LINE__, strerror(errno), sections[selected_index]->filename);
+                        content_window.content.n_raw = gen_err_opening(&content_window.content.raw);
+                    }
 
                     content_window.content.n_formatted =
                         flow_nlines(content_window.content.raw,
@@ -261,7 +281,7 @@ int site(int argc, char **argv) {
     free_content(&content_window);
     free_anim_refs(&content_window);
     delwin(index_window.window);
-    delwin(separator_win);
+    delwin(separator_window.window);
     delwin(content_window.window);
     endwin();
     return 0;

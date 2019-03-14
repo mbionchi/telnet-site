@@ -24,17 +24,13 @@
 #include <string.h>
 #include <ncurses.h>
 
-void render_separator(WINDOW *window, int selected_index) {
-    int maxx, maxy;
-    getmaxyx(window, maxy, maxx);
-    scrollok(window, 0);
-    for (int i=0; i<maxy; i++) {
-        mvwprintw(window, i, 0, "%s", i==selected_index?SEPARATOR_SELECTED:SEPARATOR_REGULAR);
+void render_separator(struct window *window) {
+    scrollok(window->window, 0);
+    for (size_t i = 0; i < window->rows; i++) {
+        mvwprintw(window->window, i, 0, "%s", i==window->scroll?SEPARATOR_SELECTED:SEPARATOR_REGULAR);
     }
-    scrollok(window, 1);
+    scrollok(window->window, 1);
 }
-
-// =========================
 
 void render_ncontent(struct window *window) {
     size_t cursor_y = 0,

@@ -82,6 +82,8 @@ struct anim_ref {
     struct anim_ref *next;
 };
 
+size_t gen_err_opening(struct nline ***nlines);
+
 size_t read_nlines(FILE *fp, struct nline ***nlines);
 size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int width);
 void print_nlines(struct nline **nlines, size_t nmemb);

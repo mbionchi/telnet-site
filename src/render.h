@@ -24,8 +24,7 @@
 #define SEPARATOR_SELECTED " <   "
 #define SEPARATOR_REGULAR  "  |  "
 
-void render_separator(WINDOW *window, int selected_index);
-
+void render_separator(struct window *window);
 void render_ncontent(struct window *window);
 void render_nline(WINDOW *window, size_t cursor_y, struct nline *nline);
 

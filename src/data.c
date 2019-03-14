@@ -24,6 +24,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#define ERR_OPENING_FILE_STR "<error opening file>"
+
 void print_lines(struct line *lines) {
     struct line *iter = lines;
     while (iter) {
@@ -198,6 +200,17 @@ struct nline *mkblank() {
     blank->text->len = 0;
     blank->text->data = strcpy(malloc(1*sizeof(char)), "");
     return blank;
+}
+
+size_t gen_err_opening(struct nline ***nlines) {
+    *nlines = malloc(sizeof(struct nline*));
+    struct nline *nline = malloc(sizeof(struct nline));
+    nline->type = TEXT;
+    nline->text = malloc(sizeof(struct string));
+    nline->text->data = strcpy(malloc((strlen(ERR_OPENING_FILE_STR)+1)*sizeof(char)), ERR_OPENING_FILE_STR);
+    nline->text->len = strlen(ERR_OPENING_FILE_STR);
+    (*nlines)[0] = nline;
+    return 1;
 }
 
 size_t read_nlines(FILE *fp, struct nline ***nlines) {

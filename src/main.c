@@ -17,12 +17,7 @@
 
 #include "site.h"
 
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <stdlib.h>
-#include <signal.h>
-#include <stdio.h>
 
 int main(int argc, char **argv) {
     exit(site(argc, argv));

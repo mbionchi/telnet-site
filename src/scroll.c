@@ -33,25 +33,23 @@ void make_scrollable(WINDOW *window) {
     wsetscrreg(window, 0, maxy-1);
 }
 
-/*
- * this is somewhat horrifying, but the separator is scrolled in the opposite
- * direction from the index!
- */
-void scroll_separator(WINDOW *window, int dy) {
-    int maxx, maxy;
-    getmaxyx(window, maxy, maxx);
-    if (dy > 0) {
-        wscrl(window, -1);
-        mvwprintw(window,  0, 0, "%s", SEPARATOR_REGULAR);
-    } else if (dy < 0) {
-        wscrl(window, 1);
-        scrollok(window, 0);
-        mvwprintw(window, maxy-1, 0, "%s", SEPARATOR_REGULAR);
-        scrollok(window, 1);
+void scroll_separator(struct window *window, int dy) {
+    if (0 < dy && window->scroll < window->rows) {
+        wscrl(window->window, -1);
+        window->scroll++;
+        scrollok(window->window, 0);
+        mvwprintw(window->window,  0, 0, "%s", SEPARATOR_REGULAR);
+        scrollok(window->window, 1);
+    } else if (dy < 0 && 1 < window->scroll) {
+        wscrl(window->window, 1);
+        window->scroll--;
+        scrollok(window->window, 0);
+        mvwprintw(window->window, window->rows-1, 0, "%s", SEPARATOR_REGULAR);
+        scrollok(window->window, 1);
     } else {
         return;
     }
-    wrefresh(window);
+    wrefresh(window->window);
 }
 
 void scroll_ncontent(struct window *window, int dy) {
