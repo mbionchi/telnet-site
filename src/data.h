@@ -22,6 +22,8 @@
 #include <dirent.h>
 #include <curses.h>
 
+char *binary_name;
+
 struct line {
     char *line;
     struct line *prev, *next;

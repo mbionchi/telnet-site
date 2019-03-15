@@ -15,9 +15,9 @@
  *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef _TELNET_SITE_SITE_H
-#define _TELNET_SITE_SITE_H
+#ifndef _TELNET_SPLASH_SITE_H
+#define _TELNET_SPLASH_SITE_H
 
-void site(char *site_path);
+void splash(char *path);
 
 #endif

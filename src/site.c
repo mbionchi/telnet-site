@@ -62,13 +62,8 @@ void winch_handler(int signo) {
  * TODO:
  *   - error handling everywhere please
  */
-int site(int argc, char **argv) {
+void site(char *path) {
     signal(SIGWINCH, winch_handler);
-
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <path-to-site.d>\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
 
     struct window index_window;
     struct window separator_window;
@@ -77,19 +72,19 @@ int site(int argc, char **argv) {
     int selected_index = 0;
     int scroll = 0;
     size_t n_sections;
-    DIR *dir = opendir(argv[1]);
+    DIR *dir = opendir(path);
     if (dir == NULL) {
-        fprintf(stderr, "[E] %s:%s:%u: %s: %s\n", argv[0], __FILE__, __LINE__, strerror(errno), argv[1]);
+        fprintf(stderr, "[E] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), path);
         exit(1);
     }
-    struct section **sections = read_sections(dir, argv[1], 1, &n_sections);
+    struct section **sections = read_sections(dir, path, 1, &n_sections);
     closedir(dir);
     FILE *fp = fopen(sections[selected_index]->filename, "r");
     if (fp != NULL) {
         content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
         fclose(fp);
     } else {
-        fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", argv[0], __FILE__, __LINE__, strerror(errno), sections[selected_index]->filename);
+        fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), sections[selected_index]->filename);
         content_window.content.n_raw = gen_err_opening(&content_window.content.raw);
     }
     initscr();
@@ -255,7 +250,7 @@ int site(int argc, char **argv) {
                         content_window.content.n_raw = read_nlines(fp, &content_window.content.raw);
                         fclose(fp);
                     } else {
-                        fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", argv[0], __FILE__, __LINE__, strerror(errno), sections[selected_index]->filename);
+                        fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), sections[selected_index]->filename);
                         content_window.content.n_raw = gen_err_opening(&content_window.content.raw);
                     }
 
@@ -284,5 +279,4 @@ int site(int argc, char **argv) {
     delwin(separator_window.window);
     delwin(content_window.window);
     endwin();
-    return 0;
 }
