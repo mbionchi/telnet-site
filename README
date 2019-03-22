@@ -5,19 +5,17 @@ TELNET-SITE
 DESCRIPTION
 -----------
 
-  telnet-site - a glorified text file reader intented to be used as a telnet site.
+  telnet-site - a glorified file reader intented to be used as a telnet site.
 
-  The telnet-site executable takes one argument, which is the path to the directory
-that is the root of the site and contains text files to be displayed.
+  The telnet-site executable takes the following parameters:
 
-  The text files can be marked up with a minimal, non-intrusive syntax that will
-allow telnet-site to do things such as flowing paragraphs and indenting list items.
-The syntax is described in the FORMATTING section.
+  --site <path-to-dir>       specify the path to the directory with site files
 
-  Furthermore, the text files can specify animations, as described in the
-ANIMATIONS section.
+  --splash <path-to-file>    specify the path to the splash screen file (optional)
 
-  Both the text window as well as the file index window are scrollable.
+  The files in the --site directory can either be plaintext with some formatting
+(see the FORMATTING and ANIMATIONS sections) or shared objects specifying special
+functions to work with the site(see the DYNAMIC LIBRARIES section).
 
 
 BUILDING
@@ -29,7 +27,7 @@ and then do the normal `./configure && make && make install` with your favourite
 flags.
 
   Otherwise, you can run
-    gcc -o telnetsite -lncurses ./src/*.c
+    gcc -o telnetsite -lncurses -ldl -Isrc ./src/*.c
 
 
 SERVING OVER TELNET
@@ -52,7 +50,7 @@ mytelnetsite stream tcp nowait <user> /usr/sbin/tcpd /usr/sbin/telnetd -h -E <pa
 with the following:
 
 #!/bin/sh
-exec <path-to-binary> <path-to-site.d>
+exec <path-to-binary> --site <path-to-site.d> [--splash <path-to-splash-file>]
 
   where <path-to-binary> is the path to the telnet-site executable, and
 <path-to-site.d> is the path to the root directory of the site.
@@ -110,6 +108,44 @@ loading... -
 ;frame 1
 loading... \
 ;loop
+
+
+DYNAMIC LIBRARIES
+-----------------
+
+  In order to allow for more interactive functionality (such as user input or
+programmable animations), telnet-site can dynamically load shared objects it
+finds in the --site path.  The shared object files must end in .so in order for
+the program to recognize it as such.  The "src/module.h" file contains the
+preprocessor macro definitions for function names that the shared object must
+define in order to interoperate with the telnet-site:
+
+void INIT_FUNC_NAME(WINDOW *)  -  mandatory, called on the initial load of the
+                                  shared object.  The WINDOW pointer points to
+                                  the section of the screen the module is supposed
+                                  to print on.
+
+void SCROLL_FUNC_NAME(int)  -  optional, called when the main input loop gets a
+                               command to scroll up (-1) or down (1).
+
+void SETMODE_FUNC_NAME(enum mode)  -  optional, called when the main input loop
+                                      detects mode change (COMMAND to INSERT or
+                                      the other way around).  Used for custom user
+                                      input.
+
+void GETCH_FUNC_NAME(int)  -  optional, called when getch() in the main input loop
+                              returns during INSERT mode.
+
+void KILL_FUNC_NAME()  -  optional, called when the content is about to go out of
+                          focus.  Is expected to clean up whatever memory was allocated
+                          during the module's life.
+
+  You can find an example that uses all of the features above to implement a
+simple guestbook in the examples/guestbook.c file.
+
+  To compile the example module as a shared library, you will need to:
+      gcc -g -o guestbook.so -Isrc -fpic -shared examples/guestbook.c src/*.c
+
 
 BUGS
 ----

@@ -18,11 +18,17 @@
 #ifndef _TELNET_SITE_DATA_H
 #define _TELNET_SITE_DATA_H
 
+#define NO_TRAILING_NEWLINE 0x1
+
 #include <stdio.h>
 #include <dirent.h>
 #include <curses.h>
 
 char *binary_name;
+
+enum content_type { STATIC, DYNAMIC };
+
+enum mode { COMMAND, INSERT };
 
 struct line {
     char *line;
@@ -32,7 +38,7 @@ struct line {
 struct section {
     char *title;
     char *filename;
-    struct line *content;
+    enum content_type type;
 };
 
 struct string {
@@ -62,12 +68,29 @@ struct nline {
     };
 };
 
-struct content {
+struct static_content {
     struct nline **raw;
     size_t n_raw;
     struct nline **formatted;
     size_t n_formatted;
     struct anim_ref *anim_refs;
+};
+
+struct dynamic_content {
+    void *so_handle;
+    void (*init_fun)(WINDOW *window);
+    void (*getch_fun)(int ch);
+    void (*scroll_fun)(int dy);
+    void (*setmode_fun)(enum mode mode);
+    void (*kill_fun)();
+};
+
+struct content {
+    enum content_type type;
+    union {
+        struct static_content *lines;
+        struct dynamic_content *dlib;
+    };
 };
 
 struct window {
@@ -84,10 +107,12 @@ struct anim_ref {
     struct anim_ref *next;
 };
 
-size_t gen_err_opening(struct nline ***nlines);
+void gen_err_opening(struct content *content);
+int read_content_from_section(struct content *content, struct section *section);
 
+struct nline *string2nline(char *str);
 size_t read_nlines(FILE *fp, struct nline ***nlines);
-size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int width);
+size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int width, int options);
 void print_nlines(struct nline **nlines, size_t nmemb);
 void free_nlines(struct nline **nlines, size_t nmemb);
 
@@ -102,7 +127,7 @@ size_t gen_index(struct section **sections, size_t nmemb, struct nline ***to, si
 
 void print_lines(struct line *lines);
 void dump_sections(struct section **sections, size_t n_sections);
-struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t *nmemb);
+struct section **read_sections(DIR *dir, char *dirname, size_t *nmemb);
 struct line *flow_content(struct line *lines, int width);
 void free_lines(struct line *lines);
 void free_content(struct window *window);

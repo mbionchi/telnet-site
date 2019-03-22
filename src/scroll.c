@@ -53,34 +53,36 @@ void scroll_separator(struct window *window, int dy) {
 }
 
 void scroll_ncontent(struct window *window, int dy) {
-    if (dy == 1 && window->scroll+window->rows < window->content.n_formatted) {
-        wscrl(window->window, 1);
-        window->scroll++;
-        render_nline(window->window, window->rows-1, window->content.formatted[window->scroll+window->rows-1]);
-        if (window->content.formatted[window->scroll-1]->type == ANIM &&
-                (window->content.formatted[window->scroll]->type != ANIM ||
-                 window->content.formatted[window->scroll]->anim->is_first_line)) {
-            pop_anim_ref_front(window);
+    if (window->content.type == STATIC && window->content.lines != NULL) {
+        if (dy == 1 && window->scroll+window->rows < window->content.lines->n_formatted) {
+            wscrl(window->window, 1);
+            window->scroll++;
+            render_nline(window->window, window->rows-1, window->content.lines->formatted[window->scroll+window->rows-1]);
+            if (window->content.lines->formatted[window->scroll-1]->type == ANIM &&
+                    (window->content.lines->formatted[window->scroll]->type != ANIM ||
+                     window->content.lines->formatted[window->scroll]->anim->is_first_line)) {
+                pop_anim_ref_front(window);
+            }
+            if (window->content.lines->formatted[window->scroll+window->rows-1]->type == ANIM &&
+                    window->content.lines->formatted[window->scroll+window->rows-1]->anim->is_first_line) {
+                push_anim_ref_back(window, window->scroll+window->rows-1);
+            }
+        } else if (dy == -1 && window->scroll > 0) {
+            wscrl(window->window, -1);
+            window->scroll--;
+            render_nline(window->window, 0, window->content.lines->formatted[window->scroll]);
+            // was there an animation that went out of focus?
+            if (window->content.lines->formatted[window->scroll+window->rows-1]->type == ANIM &&
+                    window->content.lines->formatted[window->scroll+window->rows-1]->anim->is_first_line) {
+                pop_anim_ref_back(window);
+            }
+            // is there a new animation that came into focus?
+            if (window->content.lines->formatted[window->scroll]->type == ANIM &&
+                    (window->content.lines->formatted[window->scroll+1]->type != ANIM ||
+                     window->content.lines->formatted[window->scroll+1]->anim->is_first_line)) {
+                push_anim_ref_front(window, window->scroll);
+            }
         }
-        if (window->content.formatted[window->scroll+window->rows-1]->type == ANIM &&
-                window->content.formatted[window->scroll+window->rows-1]->anim->is_first_line) {
-            push_anim_ref_back(window, window->scroll+window->rows-1);
-        }
-    } else if (dy == -1 && window->scroll > 0) {
-        wscrl(window->window, -1);
-        window->scroll--;
-        render_nline(window->window, 0, window->content.formatted[window->scroll]);
-        // was there an animation that went out of focus?
-        if (window->content.formatted[window->scroll+window->rows-1]->type == ANIM &&
-                window->content.formatted[window->scroll+window->rows-1]->anim->is_first_line) {
-            pop_anim_ref_back(window);
-        }
-        // is there a new animation that came into focus?
-        if (window->content.formatted[window->scroll]->type == ANIM &&
-                (window->content.formatted[window->scroll+1]->type != ANIM ||
-                 window->content.formatted[window->scroll+1]->anim->is_first_line)) {
-            push_anim_ref_front(window, window->scroll);
-        }
+        wrefresh(window->window);
     }
-    wrefresh(window->window);
 }

@@ -33,16 +33,18 @@ void render_separator(struct window *window) {
 }
 
 void render_ncontent(struct window *window) {
-    size_t cursor_y = 0,
-           i = window->scroll;
-    while (i < window->content.n_formatted && cursor_y < window->rows) {
-        render_nline(window->window, cursor_y, window->content.formatted[i]);
-        if (window->content.formatted[i]->type == ANIM &&
-                window->content.formatted[i]->anim->is_first_line) {
-            push_anim_ref_back(window, i);
+    if (window->content.type == STATIC && window->content.lines != NULL) {
+        size_t cursor_y = 0,
+               i = window->scroll;
+        while (i < window->content.lines->n_formatted && cursor_y < window->rows) {
+            render_nline(window->window, cursor_y, window->content.lines->formatted[i]);
+            if (window->content.lines->formatted[i]->type == ANIM &&
+                    window->content.lines->formatted[i]->anim->is_first_line) {
+                push_anim_ref_back(window, i);
+            }
+            i++;
+            cursor_y++;
         }
-        i++;
-        cursor_y++;
     }
 }
 

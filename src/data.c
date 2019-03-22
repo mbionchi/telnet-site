@@ -15,31 +15,29 @@
  *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "data.h"
+
+#include "module.h"
+#include <dlfcn.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <dirent.h>
 #include <ctype.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/stat.h>
 
 #define ERR_OPENING_FILE_STR "<error opening file>"
-
-void print_lines(struct line *lines) {
-    struct line *iter = lines;
-    while (iter) {
-        fprintf(stderr, "%s\n", iter->line);
-        iter = iter->next;
-    }
-}
 
 void dump_sections(struct section **sections, size_t n_sections) {
     fprintf(stderr, "%u sections total\n", n_sections);
     for (int i=0; i<n_sections; i++) {
         fprintf(stderr, "%s (%s):\n\n", sections[i]->title, sections[i]->filename);
-        print_lines(sections[i]->content);
-        fprintf(stderr, "\n");
     }
 }
 
@@ -49,8 +47,51 @@ int compare_sections(const void *a, const void *b) {
     return strcmp(s1->filename, s2->filename);
 }
 
+int read_content_from_section(struct content *content, struct section *section) {
+    if (section->type == STATIC) {
+        content->type = STATIC;
+        content->lines = malloc(sizeof(struct static_content));
+        content->lines->anim_refs = NULL;
+        FILE *fp = fopen(section->filename, "r");
+        if (fp != NULL) {
+            content->lines->n_raw = read_nlines(fp, &content->lines->raw);
+            fclose(fp);
+        } else {
+            fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), section->filename);
+            free(content->lines);
+            content->lines = NULL;
+            return 1;
+        }
+    } else if (section->type = DYNAMIC) {
+        content->type = DYNAMIC;
+        content->dlib = malloc(sizeof(struct dynamic_content));
+        content->dlib->so_handle = dlopen(section->filename, RTLD_LAZY);
+        if (content->dlib->so_handle == NULL) {
+            fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, dlerror());
+            free(content->dlib);
+            content->dlib = NULL;
+            return 1;
+        } else {
+            content->dlib->init_fun = dlsym(content->dlib->so_handle, INIT_FUNC_NAME_S);
+            if (content->dlib->init_fun == NULL) {
+                fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, dlerror());
+                dlclose(content->dlib->so_handle);
+                free(content->dlib);
+                content->dlib = NULL;
+                return 1;
+            } else {
+                content->dlib->getch_fun = dlsym(content->dlib->so_handle, GETCH_FUNC_NAME_S);
+                content->dlib->scroll_fun = dlsym(content->dlib->so_handle, SCROLL_FUNC_NAME_S);
+                content->dlib->setmode_fun = dlsym(content->dlib->so_handle, SETMODE_FUNC_NAME_S);
+                content->dlib->kill_fun = dlsym(content->dlib->so_handle, KILL_FUNC_NAME_S);
+            }
+        }
+    }
+    return 0;
+}
+
 /* TODO: errcheck */
-struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t *nmemb) {
+struct section **read_sections(DIR *dir, char *dirname, size_t *nmemb) {
     int linear_step = 8;
     *nmemb = 8;
     struct section **base = malloc(*nmemb*sizeof(struct section*));
@@ -61,11 +102,11 @@ struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t
             struct stat sb;
             char *filename = malloc((strlen(dirname)+strlen(dirent->d_name)+2)*sizeof(char));
             sprintf(filename, "%s/%s", dirname, dirent->d_name);
-            if (follow_links) {
-                stat(filename, &sb);
-            } else {
-                lstat(filename, &sb);
-            }
+#ifdef FOLLOW_LINKS
+            stat(filename, &sb);
+#else
+            lstat(filename, &sb);
+#endif
             if ((sb.st_mode & S_IFMT) == S_IFREG || (sb.st_mode & S_IFMT) == S_IFDIR) {
                 if (i >= *nmemb) {
                     *nmemb += linear_step;
@@ -79,7 +120,13 @@ struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t
                     title++;
                 }
                 size_t title_len = strlen(title);
-                base[i]->title = strcpy(malloc((title_len+1)*sizeof(char)), title);
+                if (strcmp(".so", title+title_len-3) == 0) {
+                    base[i]->type = DYNAMIC;
+                    title_len -= 3;
+                } else {
+                    base[i]->type = STATIC;
+                }
+                base[i]->title = strncpy(malloc((title_len+1)*sizeof(char)), title, title_len);
                 base[i]->filename = filename;
                 i++;
             }
@@ -91,106 +138,6 @@ struct section **read_sections(DIR *dir, char *dirname, int follow_links, size_t
     return base;
 }
 
-void free_lines(struct line *lines) {
-    struct line *iter = lines;
-    struct line *prev;
-    while (iter) {
-        prev = iter;
-        iter = iter->next;
-        free(prev->line);
-        free(prev);
-    }
-}
-
-/*
- * this flow algorithm has:
- *   - word wrapping
- *   - list indentation, for example
- *     like this <-
- *   - a bug that will SIGSEGV this
- *     program if a contigous word is
- *     longer than `width`
- *   - it also adds a leading and
- *     trailing \n for style purposes
- */
-struct line *flow_content(struct line *lines, int width) {
-    struct line *rv_head = malloc(sizeof(struct line));
-    struct line *rv_iter = rv_head;
-    struct line *rv_prev = NULL;
-    rv_iter->prev = NULL;
-    rv_iter->line = strcpy(malloc(sizeof(char)), ""); /* this may seem stupid but is needed for
-                                                         consistency when using free() */
-    rv_iter->next = malloc(sizeof(struct line));
-    rv_prev = rv_iter;
-    rv_iter = rv_iter->next;
-    rv_iter->prev = rv_prev;
-    struct line *iter = lines;
-    while (iter) {
-        char *head = iter->line;
-        size_t head_len = strlen(head);
-        unsigned prepend_space;
-        int found_non_whitespace = 0;
-        for (prepend_space=0;
-             prepend_space<head_len && !isalpha(head[prepend_space]);
-             prepend_space++) {
-            if (!found_non_whitespace && !isspace(head[prepend_space])) {
-                found_non_whitespace = 1;
-            }
-        }
-        if (!found_non_whitespace || prepend_space == head_len) {
-            prepend_space = 0;
-        }
-        char *tail = head;
-        int split_index, prev_split_index;
-        while (tail != NULL) {
-            tail = index(head, ' ');
-            split_index = tail-head;
-            prev_split_index = split_index;
-            while (tail != NULL && split_index+prepend_space < width) {
-                prev_split_index = split_index;
-                tail = index(tail+1, ' ');
-                split_index = tail-head;
-            }
-            if (tail != NULL || strlen(head)+prepend_space > width) {
-                head[prev_split_index] = '\0';
-                if (head == iter->line) {
-                    rv_iter->line = strcpy(malloc((strlen(head)+1)*sizeof(char)), head);
-                } else {
-                    rv_iter->line = malloc((strlen(head)+prepend_space+1)*sizeof(char));
-                    for (int i=0; i<prepend_space; i++) {
-                        rv_iter->line[i] = ' ';
-                    }
-                    strcpy(rv_iter->line+prepend_space, head);
-                }
-                rv_iter->next = malloc(sizeof(struct line));
-                rv_prev = rv_iter;
-                rv_iter = rv_iter->next;
-                rv_iter->prev = rv_prev;
-                head[prev_split_index] = ' ';
-                head += prev_split_index+1;
-            }
-        }
-        if (head == iter->line) {
-            rv_iter->line = strcpy(malloc((strlen(head)+1)*sizeof(char)), head);
-        } else {
-            rv_iter->line = malloc((strlen(head)+prepend_space+1)*sizeof(char));
-            for (int i=0; i<prepend_space; i++) {
-                rv_iter->line[i] = ' ';
-            }
-            strcpy(rv_iter->line+prepend_space, head);
-        }
-        rv_iter->next = malloc(sizeof(struct line));
-        rv_prev = rv_iter;
-        rv_iter = rv_iter->next;
-        rv_iter->prev = rv_prev;
-        iter = iter->next;
-    }
-    rv_iter->line = strcpy(malloc(sizeof(char)), "");
-    rv_iter->next = NULL;
-    return rv_head;
-}
-
-// ======== new stuff:
 // big todo: errcheck mallocs, strncpys, getlines
 
 struct nline *mkblank() {
@@ -202,15 +149,25 @@ struct nline *mkblank() {
     return blank;
 }
 
-size_t gen_err_opening(struct nline ***nlines) {
-    *nlines = malloc(sizeof(struct nline*));
+void gen_err_opening(struct content *content) {
+    content->type = STATIC;
+    content->lines = malloc(sizeof(struct static_content));
+    content->lines->n_raw = 1;
+    content->lines->raw = malloc(sizeof(struct nline*));
+    content->lines->raw[0] = malloc(sizeof(struct nline));
+    content->lines->raw[0]->type = TEXT;
+    content->lines->raw[0]->text = malloc(sizeof(struct string));
+    content->lines->raw[0]->text->data = strcpy(malloc((strlen(ERR_OPENING_FILE_STR)+1)*sizeof(char)), ERR_OPENING_FILE_STR);
+    content->lines->raw[0]->text->len = strlen(ERR_OPENING_FILE_STR);
+}
+
+struct nline *string2nline(char *str) {
     struct nline *nline = malloc(sizeof(struct nline));
     nline->type = TEXT;
     nline->text = malloc(sizeof(struct string));
-    nline->text->data = strcpy(malloc((strlen(ERR_OPENING_FILE_STR)+1)*sizeof(char)), ERR_OPENING_FILE_STR);
-    nline->text->len = strlen(ERR_OPENING_FILE_STR);
-    (*nlines)[0] = nline;
-    return 1;
+    nline->text->len = strlen(str);
+    nline->text->data = strcpy(malloc((nline->text->len+1)*sizeof(char)), str);
+    return nline;
 }
 
 size_t read_nlines(FILE *fp, struct nline ***nlines) {
@@ -338,7 +295,7 @@ next_line:
     return n_raw;
 }
 
-size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int width) {
+size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int width, int options) {
     size_t n_to = 0;
     size_t nmemb = 8,
            linear_step = 8;
@@ -448,12 +405,14 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
         }
         i++;
     }
-    if (n_to >= nmemb) {
-        nmemb++;
-        *to = realloc(*to, nmemb*sizeof(struct nline*));
+    if (!(options & NO_TRAILING_NEWLINE)) {
+        if (n_to >= nmemb) {
+            nmemb++;
+            *to = realloc(*to, nmemb*sizeof(struct nline*));
+        }
+        (*to)[n_to] = mkblank();
+        n_to++;
     }
-    (*to)[n_to] = mkblank();
-    n_to++;
     return n_to;
 }
 
@@ -502,13 +461,37 @@ void free_nlines(struct nline **nlines, size_t nmemb) {
 }
 
 void free_content(struct window *window) {
-    if (window->content.raw != NULL) {
-        free_nlines(window->content.raw, window->content.n_raw);
-        window->content.raw = NULL;
+    if (window->content.type == STATIC && window->content.lines != NULL) {
+        if (window->content.lines->raw != NULL) {
+            free_nlines(window->content.lines->raw, window->content.lines->n_raw);
+            window->content.lines->raw = NULL;
+        }
+        if (window->content.lines->formatted != NULL) {
+            free_nlines(window->content.lines->formatted, window->content.lines->n_formatted);
+            window->content.lines->formatted = NULL;
+        }
+        free(window->content.lines);
+        window->content.lines = NULL;
     }
-    if (window->content.formatted != NULL) {
-        free_nlines(window->content.formatted, window->content.n_formatted);
-        window->content.formatted = NULL;
+    if (window->content.type == DYNAMIC && window->content.dlib != NULL) {
+        if (window->content.dlib->init_fun != NULL) {
+            window->content.dlib->init_fun = NULL;
+        }
+        if (window->content.dlib->getch_fun != NULL) {
+            window->content.dlib->getch_fun = NULL;
+        }
+        if (window->content.dlib->scroll_fun != NULL) {
+            window->content.dlib->scroll_fun = NULL;
+        }
+        if (window->content.dlib->kill_fun != NULL) {
+            window->content.dlib->kill_fun = NULL;
+        }
+        if (window->content.dlib->so_handle != NULL) {
+            dlclose(window->content.dlib->so_handle);
+            window->content.dlib->so_handle = NULL;
+        }
+        free(window->content.dlib);
+        window->content.dlib = NULL;
     }
 }
 

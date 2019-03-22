@@ -15,25 +15,22 @@
  *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "log.h"
+#ifndef TELNET_SITE_MODULE_H
+#define TELNET_SITE_MODULE_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
+#define QUOTE(s) #s
+#define TOSTRING(s) QUOTE(s)
 
-#define LOGPATH "/tmp/telnetsite"
+#define INIT_FUNC_NAME module_init
+#define SCROLL_FUNC_NAME module_scroll
+#define SETMODE_FUNC_NAME module_setmode
+#define GETCH_FUNC_NAME module_getch
+#define KILL_FUNC_NAME module_kill
 
-void errlog(char *fmt, ...) {
-    static FILE *fp = NULL;
-    if (fp == NULL) {
-        fp = fopen(LOGPATH, "a");
-    }
-    if (fp != NULL) {
-        va_list args;
-        va_start(args, fmt);
-        vfprintf(fp, fmt, args);
-        fflush(fp);
-        va_end(args);
-    }
-}
+#define INIT_FUNC_NAME_S TOSTRING(INIT_FUNC_NAME)
+#define SCROLL_FUNC_NAME_S TOSTRING(SCROLL_FUNC_NAME)
+#define SETMODE_FUNC_NAME_S TOSTRING(SETMODE_FUNC_NAME)
+#define GETCH_FUNC_NAME_S TOSTRING(GETCH_FUNC_NAME)
+#define KILL_FUNC_NAME_S TOSTRING(KILL_FUNC_NAME)
 
+#endif

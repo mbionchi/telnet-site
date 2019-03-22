@@ -1,3 +1,20 @@
+/*
+ *   This file is part of telnet-site.
+ *
+ *   telnet-site is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   telnet-site is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with telnet-site.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "splash.h"
 
 #include "data.h"
@@ -18,11 +35,11 @@ void splash(char *path) {
 
     FILE *fp = fopen(path, "r");
     if (fp != NULL) {
-        splash_window.content.n_raw = read_nlines(fp, &splash_window.content.raw);
+        splash_window.content.lines->n_raw = read_nlines(fp, &splash_window.content.lines->raw);
         fclose(fp);
     } else {
         fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), path);
-        splash_window.content.n_raw = gen_err_opening(&splash_window.content.raw);
+        gen_err_opening(&splash_window.content);
     }
 
     splash_window.window = initscr();
@@ -35,11 +52,12 @@ void splash(char *path) {
     splash_window.rows = LINES;
     splash_window.scroll = 0;
 
-    splash_window.content.anim_refs = NULL;
-    splash_window.content.n_formatted = flow_nlines(splash_window.content.raw,
-                                                    splash_window.content.n_raw,
-                                                    &splash_window.content.formatted,
-                                                    splash_window.cols);
+    splash_window.content.lines->anim_refs = NULL;
+    splash_window.content.lines->n_formatted = flow_nlines(splash_window.content.lines->raw,
+                                                    splash_window.content.lines->n_raw,
+                                                    &splash_window.content.lines->formatted,
+                                                    splash_window.cols,
+                                                    0);
 
     render_ncontent(&splash_window);
 
