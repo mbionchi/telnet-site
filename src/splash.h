@@ -18,8 +18,6 @@
 #ifndef _TELNET_SPLASH_SITE_H
 #define _TELNET_SPLASH_SITE_H
 
-#include <ncurses.h>
-
 void splash(char *path);
 
 #endif

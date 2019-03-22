@@ -32,13 +32,6 @@
 void splash(char *path) {
     struct window splash_window;
 
-    splash_window.window = initscr();
-    cbreak();
-    halfdelay(1);
-    noecho();
-    curs_set(0);
-    nonl();
-
     FILE *fp = fopen(path, "r");
     if (fp != NULL) {
         splash_window.content.type = STATIC;
@@ -49,6 +42,12 @@ void splash(char *path) {
         fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), path);
         gen_err_opening(&splash_window.content);
     }
+
+    splash_window.window = initscr();
+    cbreak();
+    halfdelay(1);
+    noecho();
+    curs_set(0);
 
     splash_window.cols = COLS;
     splash_window.rows = LINES;
@@ -66,9 +65,11 @@ void splash(char *path) {
     wrefresh(splash_window.window);
 
     int ch = getch();
-    while (ch == ERR) {
+    // 410: idk why, but it has to do with SIGWINCH
+    while (ch == ERR || ch == 410) {
         if (splash_window.content.type == STATIC) {
             anim_tick(&splash_window);
+            wrefresh(splash_window.window);
         }
         ch = getch();
     }
