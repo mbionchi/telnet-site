@@ -63,7 +63,7 @@ void winch_handler(int signo) {
  *   - error handling everywhere please
  *   - refactor the event loop, it's horrifying atm
  */
-void site(WINDOW *window, char *path) {
+void site(char *path) {
     signal(SIGWINCH, winch_handler);
 
     struct window index_window;
@@ -87,6 +87,14 @@ void site(WINDOW *window, char *path) {
     if (rv != 0) {
         gen_err_opening(&content_window.content);
     }
+
+    WINDOW *main_window = initscr();
+    cbreak();
+    halfdelay(1);
+    noecho();
+    curs_set(0);
+    nonl();
+    keypad(main_window, 1);
 
     int index_left_margin = 2;
     int index_cols = get_index_width(sections, n_sections);
@@ -393,4 +401,5 @@ void site(WINDOW *window, char *path) {
     delwin(index_window.window);
     delwin(separator_window.window);
     delwin(content_window.window);
+    endwin();
 }

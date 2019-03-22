@@ -20,6 +20,6 @@
 
 #include <ncurses.h>
 
-void splash(WINDOW *window, char *path);
+void splash(char *path);
 
 #endif

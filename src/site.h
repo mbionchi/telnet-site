@@ -20,6 +20,6 @@
 
 #include <ncurses.h>
 
-void site(WINDOW *window, char *site_path);
+void site(char *site_path);
 
 #endif

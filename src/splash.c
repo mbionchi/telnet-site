@@ -29,10 +29,15 @@
 #include <string.h>
 #include <signal.h>
 
-void splash(WINDOW *window, char *path) {
-    signal(SIGWINCH, SIG_IGN);
-
+void splash(char *path) {
     struct window splash_window;
+
+    splash_window.window = initscr();
+    cbreak();
+    halfdelay(1);
+    noecho();
+    curs_set(0);
+    nonl();
 
     FILE *fp = fopen(path, "r");
     if (fp != NULL) {
@@ -44,8 +49,6 @@ void splash(WINDOW *window, char *path) {
         fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), path);
         gen_err_opening(&splash_window.content);
     }
-
-    splash_window.window = window;
 
     splash_window.cols = COLS;
     splash_window.rows = LINES;
@@ -60,7 +63,7 @@ void splash(WINDOW *window, char *path) {
 
     render_ncontent(&splash_window);
 
-    wrefresh(window);
+    wrefresh(splash_window.window);
 
     int ch = getch();
     while (ch == ERR) {
@@ -72,6 +75,7 @@ void splash(WINDOW *window, char *path) {
     free_content(&splash_window);
     free_anim_refs(&splash_window);
     clear();
-    wrefresh(window);
+    wrefresh(splash_window.window);
+    endwin();
     return;
 }

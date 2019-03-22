@@ -46,20 +46,12 @@ int main(int argc, char **argv) {
         opt = getopt_long_only(argc, argv, "", options, NULL);
     }
 
-    WINDOW *main_window = initscr();
-    cbreak();
-    halfdelay(1);
-    noecho();
-    curs_set(0);
-    nonl();
-    keypad(main_window, 1);
     if (!site_path) {
         fprintf(stderr, "Usage: %s --site <path-to-dir> [--splash <path-to-file>]\n", binary_name);
         exit(1);
     }
     if (splash_path) {
-        splash(main_window, splash_path);
+        splash(splash_path);
     }
-    site(main_window, site_path);
-    endwin();
+    site(site_path);
 }
