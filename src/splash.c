@@ -24,17 +24,20 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <ncurses.h>
 #include <errno.h>
 #include <string.h>
 #include <signal.h>
 
-void splash(char *path) {
+void splash(WINDOW *window, char *path) {
     signal(SIGWINCH, SIG_IGN);
 
     struct window splash_window;
 
     FILE *fp = fopen(path, "r");
     if (fp != NULL) {
+        splash_window.content.type = STATIC;
+        splash_window.content.lines = malloc(sizeof(struct static_content));
         splash_window.content.lines->n_raw = read_nlines(fp, &splash_window.content.lines->raw);
         fclose(fp);
     } else {
@@ -42,11 +45,7 @@ void splash(char *path) {
         gen_err_opening(&splash_window.content);
     }
 
-    splash_window.window = initscr();
-    cbreak();
-    halfdelay(1);
-    noecho();
-    curs_set(0);
+    splash_window.window = window;
 
     splash_window.cols = COLS;
     splash_window.rows = LINES;
@@ -61,8 +60,7 @@ void splash(char *path) {
 
     render_ncontent(&splash_window);
 
-    refresh();
-    wrefresh(splash_window.window);
+    wrefresh(window);
 
     int ch = getch();
     while (ch == ERR) {
@@ -72,7 +70,6 @@ void splash(char *path) {
     free_content(&splash_window);
     free_anim_refs(&splash_window);
     clear();
-    refresh();
-    endwin();
+    wrefresh(window);
     return;
 }

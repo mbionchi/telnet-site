@@ -127,6 +127,7 @@ struct section **read_sections(DIR *dir, char *dirname, size_t *nmemb) {
                     base[i]->type = STATIC;
                 }
                 base[i]->title = strncpy(malloc((title_len+1)*sizeof(char)), title, title_len);
+                base[i]->title[title_len] = '\0';
                 base[i]->filename = filename;
                 i++;
             }

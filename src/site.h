@@ -18,6 +18,8 @@
 #ifndef _TELNET_SITE_SITE_H
 #define _TELNET_SITE_SITE_H
 
-void site(char *site_path);
+#include <ncurses.h>
+
+void site(WINDOW *window, char *site_path);
 
 #endif
