@@ -64,7 +64,9 @@ void splash(WINDOW *window, char *path) {
 
     int ch = getch();
     while (ch == ERR) {
-        anim_tick(&splash_window);
+        if (splash_window.content.type == STATIC) {
+            anim_tick(&splash_window);
+        }
         ch = getch();
     }
     free_content(&splash_window);

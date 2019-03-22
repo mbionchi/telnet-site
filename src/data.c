@@ -107,7 +107,7 @@ struct section **read_sections(DIR *dir, char *dirname, size_t *nmemb) {
 #else
             lstat(filename, &sb);
 #endif
-            if ((sb.st_mode & S_IFMT) == S_IFREG || (sb.st_mode & S_IFMT) == S_IFDIR) {
+            if ((sb.st_mode & S_IFMT) == S_IFREG) {
                 if (i >= *nmemb) {
                     *nmemb += linear_step;
                     base = realloc(base, *nmemb*sizeof(struct section*));
