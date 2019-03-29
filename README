@@ -5,7 +5,7 @@ TELNET-SITE
 DESCRIPTION
 -----------
 
-  telnet-site - a glorified file reader intented to be used as a telnet site.
+  telnet-site - a glorified file reader intended to be used as a telnet site.
 
   The telnet-site executable takes the following parameters:
 
