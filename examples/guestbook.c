@@ -290,7 +290,7 @@ void GETCH_FUNC_NAME(int ch) {
                 handle_i--;
                 handle_data[handle_i] = '\0';
             }
-        } else if (ch == '\r') {
+        } else if (ch == '\r' || ch == KEY_ENTER) {
             guestbook_mode = PROMPT_ENTRY;
             free_content(&guestbook_window);
             guestbook_window.content.lines = malloc(sizeof(struct static_content));
@@ -330,7 +330,7 @@ void GETCH_FUNC_NAME(int ch) {
                 entry_i--;
                 entry_data[entry_i] = '\0';
             }
-        } else if (ch == '\r') {
+        } else if (ch == '\r' || ch == KEY_ENTER) {
             guestbook_mode = PROMPT_CONFIRM;
             free_content(&guestbook_window);
             guestbook_window.content.lines = malloc(sizeof(struct static_content));
