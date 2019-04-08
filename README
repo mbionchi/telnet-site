@@ -83,6 +83,21 @@ will be aligned to the first letter character on this line, for example:
      number
      one
 
+  - You can change text or animation alignment by using the `;align <how>`
+    directive, on a line by itself, where <how> is one-of {left,right,center}.
+    The chosen alignment will apply until explicitly changed.  Example:
+
+;align center
+* * *
+
+;align right
+  This paragraph will be right-aligned.
+
+  And same for this one.
+
+;align left
+  However, this paragraph will be left-aligned!  How wonderful.
+
 
 ANIMATIONS
 ----------

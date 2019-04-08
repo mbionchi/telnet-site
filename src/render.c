@@ -37,7 +37,7 @@ void render_ncontent(struct window *window) {
         size_t cursor_y = 0,
                i = window->scroll;
         while (i < window->content.lines->n_formatted && cursor_y < window->rows) {
-            render_nline(window->window, cursor_y, window->content.lines->formatted[i]);
+            render_nline(window, cursor_y, window->content.lines->formatted[i]);
             if (window->content.lines->formatted[i]->type == ANIM &&
                     window->content.lines->formatted[i]->anim->is_first_line) {
                 push_anim_ref_back(window, i);
@@ -48,12 +48,24 @@ void render_ncontent(struct window *window) {
     }
 }
 
-void render_nline(WINDOW *window, size_t cursor_y, struct nline *nline) {
-    scrollok(window, 0);
+void render_nline(struct window *window, size_t cursor_y, struct nline *nline) {
+    struct string *s = NULL;
     if (nline->type == TEXT) {
-        mvwprintw(window, cursor_y, 0, "%s", nline->text->data);
+        s = nline->text;
     } else if (nline->type == ANIM) {
-        mvwprintw(window, cursor_y, 0, nline->anim->frames[nline->anim->current_frame_index].s->data);
+        s = nline->anim->frames[nline->anim->current_frame_index].s;
     }
-    scrollok(window, 1);
+    if (s != NULL) {
+        size_t cursor_x = 0; /* assume left-align by default */
+        if (nline->align == RIGHT) {
+            cursor_x = window->cols - s->len;
+            fprintf(stderr, "renderer detected right-align, cursor_x = %d\n", cursor_x);
+        } else if (nline->align == CENTER) {
+            cursor_x = (window->cols - s->len)/2;
+            fprintf(stderr, "renderer detected center-align, cursor_x = %d\n", cursor_x);
+        }
+        scrollok(window->window, 0);
+        mvwprintw(window->window, cursor_y, cursor_x, "%s", s->data);
+        scrollok(window->window, 1);
+    }
 }

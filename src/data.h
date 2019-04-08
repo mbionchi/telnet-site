@@ -20,6 +20,11 @@
 
 #define NO_TRAILING_NEWLINE 0x1
 
+#define ALIGN_HINT ";align"
+#define ALIGN_LEFT_HINT "left"
+#define ALIGN_RIGHT_HINT "right"
+#define ALIGN_CENTER_HINT "center"
+
 #include <stdio.h>
 #include <dirent.h>
 #include <curses.h>
@@ -30,10 +35,7 @@ enum content_type { STATIC, DYNAMIC };
 
 enum mode { COMMAND, INSERT };
 
-struct line {
-    char *line;
-    struct line *prev, *next;
-};
+enum align { LEFT, CENTER, RIGHT };
 
 struct section {
     char *title;
@@ -62,6 +64,7 @@ struct animation {
 
 struct nline {
     enum { ANIM, TEXT } type;
+    enum align align;
     union {
         struct string *text;
         struct animation *anim;
@@ -125,11 +128,8 @@ size_t gen_index(struct section **sections, size_t nmemb, struct nline ***to, si
 
 // ======= old stuff:
 
-void print_lines(struct line *lines);
 void dump_sections(struct section **sections, size_t n_sections);
 struct section **read_sections(DIR *dir, char *dirname, size_t *nmemb);
-struct line *flow_content(struct line *lines, int width);
-void free_lines(struct line *lines);
 void free_content(struct window *window);
 
 #endif

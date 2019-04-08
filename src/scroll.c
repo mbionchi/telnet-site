@@ -22,6 +22,7 @@
 #include "site.h"
 #include "render.h"
 #include "data.h"
+
 #include <string.h>
 #include <ncurses.h>
 
@@ -57,7 +58,7 @@ void scroll_ncontent(struct window *window, int dy) {
         if (dy == 1 && window->scroll+window->rows < window->content.lines->n_formatted) {
             wscrl(window->window, 1);
             window->scroll++;
-            render_nline(window->window, window->rows-1, window->content.lines->formatted[window->scroll+window->rows-1]);
+            render_nline(window, window->rows-1, window->content.lines->formatted[window->scroll+window->rows-1]);
             if (window->content.lines->formatted[window->scroll-1]->type == ANIM &&
                     (window->content.lines->formatted[window->scroll]->type != ANIM ||
                      window->content.lines->formatted[window->scroll]->anim->is_first_line)) {
@@ -70,7 +71,7 @@ void scroll_ncontent(struct window *window, int dy) {
         } else if (dy == -1 && window->scroll > 0) {
             wscrl(window->window, -1);
             window->scroll--;
-            render_nline(window->window, 0, window->content.lines->formatted[window->scroll]);
+            render_nline(window, 0, window->content.lines->formatted[window->scroll]);
             // was there an animation that went out of focus?
             if (window->content.lines->formatted[window->scroll+window->rows-1]->type == ANIM &&
                     window->content.lines->formatted[window->scroll+window->rows-1]->anim->is_first_line) {

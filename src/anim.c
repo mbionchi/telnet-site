@@ -17,6 +17,7 @@
 
 #include "anim.h"
 #include "data.h"
+#include "render.h"
 
 #include <stdlib.h>
 #include <stddef.h>
@@ -106,8 +107,7 @@ void anim_tick(struct window *window) {
                         window->content.lines->formatted[i]->anim->current_frame_index =
                             (window->content.lines->formatted[i]->anim->current_frame_index + 1) %
                             window->content.lines->formatted[i]->anim->n_frames;
-                        mvwprintw(window->window, y, 0, "%s",
-                                window->content.lines->formatted[i]->anim->frames[window->content.lines->formatted[i]->anim->current_frame_index].s->data);
+                        render_nline(window, y, window->content.lines->formatted[i]);
                         i++;
                         y++;
                         while (i < window->content.lines->n_formatted &&
@@ -116,8 +116,7 @@ void anim_tick(struct window *window) {
                             window->content.lines->formatted[i]->anim->current_frame_index =
                                 (window->content.lines->formatted[i]->anim->current_frame_index + 1) %
                                 window->content.lines->formatted[i]->anim->n_frames;
-                            mvwprintw(window->window, y, 0, "%s",
-                                    window->content.lines->formatted[i]->anim->frames[window->content.lines->formatted[i]->anim->current_frame_index].s->data);
+                            render_nline(window, y, window->content.lines->formatted[i]);
                             i++;
                             y++;
                         }

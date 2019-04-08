@@ -22,6 +22,7 @@
 #include "data.h"
 
 #include "module.h"
+
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -171,6 +172,10 @@ struct nline *string2nline(char *str) {
     return nline;
 }
 
+/*
+ * the following two functions should be rewritten in a more
+ * understanable and maintainable way
+ */
 size_t read_nlines(FILE *fp, struct nline ***nlines) {
     size_t n_raw = 0;
     size_t nmemb = 8,
@@ -180,6 +185,7 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
          *full_line = NULL;
     size_t line_buf_len = 0,
            full_line_len = 0;
+    enum align align = LEFT;
     ssize_t rv = getline(&line, &line_buf_len, fp);
     while (rv != -1) {
         line[rv-1] = '\0';
@@ -206,6 +212,7 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
                             if (n_frames < 1) {
                                 struct nline *nline = malloc(sizeof(struct nline));
                                 nline->type = ANIM;
+                                nline->align = align;
                                 nline->anim = malloc(sizeof(struct animation));
                                 nline->anim->nmemb_frames = 8;
                                 nline->anim->frames = malloc(nline->anim->nmemb_frames*sizeof(struct frame));
@@ -261,6 +268,21 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
                     (*nlines)[n_raw]->anim->loop = 0;
                 }
                 n_raw += n_anim_lines;
+                free(line);
+                goto next_line;
+            } else if (!strncmp(line, ALIGN_HINT, strlen(ALIGN_HINT))) {
+                char *how = index(line, ' ');
+                if (how != NULL) {
+                    how++;
+                    if (!strcmp(how, ALIGN_LEFT_HINT)) {
+                        align = LEFT;
+                    } else if (!strcmp(how, ALIGN_RIGHT_HINT)) {
+                        align = RIGHT;
+                    } else if (!strcmp(how, ALIGN_CENTER_HINT)) {
+                        align = CENTER;
+                    }
+                }
+                free(line);
                 goto next_line;
             } else {
                 full_line = line;
@@ -277,6 +299,7 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
         if (full_line != NULL && (full_line_len == 0 || full_line[full_line_len-1] != ' ')) {
             struct nline *nline = malloc(sizeof(struct nline));
             nline->type = TEXT;
+            nline->align = align;
             nline->text = malloc(sizeof(struct string));
             nline->text->data = full_line;
             nline->text->len = full_line_len;
@@ -348,6 +371,7 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
                         }
                         struct nline *nline = malloc(sizeof(struct nline));
                         nline->type = TEXT;
+                        nline->align = from[i]->align;
                         nline->text = s1;
                         if (n_to >= nmemb) {
                             nmemb += linear_step;
@@ -372,6 +396,7 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
                 }
                 struct nline *nline = malloc(sizeof(struct nline));
                 nline->type = TEXT;
+                nline->align = from[i]->align;
                 nline->text = s;
                 if (n_to >= nmemb) {
                     nmemb += linear_step;
@@ -382,6 +407,7 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
         } else if (from[i]->type == ANIM) {
             struct nline *nline = malloc(sizeof(struct nline));
             nline->type = ANIM;
+            nline->align = from[i]->align;
             nline->anim = malloc(sizeof(struct animation));
             nline->anim->current_frame_index = from[i]->anim->current_frame_index;
             nline->anim->n_frames = from[i]->anim->n_frames;
@@ -391,11 +417,13 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
             for (size_t i_frame = 0; i_frame < nline->anim->n_frames; i_frame++) {
                 nline->anim->frames[i_frame].delay = from[i]->anim->frames[i_frame].delay;
                 nline->anim->frames[i_frame].s = malloc(sizeof(struct string));
-                nline->anim->frames[i_frame].s->len = from[i]->anim->frames[i_frame].s->len;
+                size_t tmp_len = from[i]->anim->frames[i_frame].s->len > width ? width : from[i]->anim->frames[i_frame].s->len;
+                nline->anim->frames[i_frame].s->len = tmp_len;
                 nline->anim->frames[i_frame].s->data =
-                    strncpy(malloc(nline->anim->frames[i_frame].s->len*sizeof(char)+1),
+                    strncpy(malloc(tmp_len*sizeof(char)+1),
                             from[i]->anim->frames[i_frame].s->data,
-                            from[i]->anim->frames[i_frame].s->len+1);
+                            tmp_len);
+                nline->anim->frames[i_frame].s->data[tmp_len] = '\0';
             }
             if (n_to >= nmemb) {
                 nmemb += linear_step;

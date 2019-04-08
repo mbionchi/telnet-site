@@ -26,6 +26,6 @@
 
 void render_separator(struct window *window);
 void render_ncontent(struct window *window);
-void render_nline(WINDOW *window, size_t cursor_y, struct nline *nline);
+void render_nline(struct window *window, size_t cursor_y, struct nline *nline);
 
 #endif
