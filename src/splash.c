@@ -62,7 +62,8 @@ void splash(char *path) {
     wrefresh(splash_window.window);
 
     int ch = getch();
-    while (ch == ERR) {
+    while (ch == ERR || ch == 410) { /* 410 is returned on some systems if getch() was interrupted by
+                                        a signal handler */
         if (splash_window.content.type == STATIC) {
             anim_tick(&splash_window);
             if (had_winch) {
