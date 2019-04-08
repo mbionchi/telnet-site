@@ -21,6 +21,8 @@
 #include "render.h"
 #include "scroll.h"
 #include "data.h"
+#include "winch.h"
+
 #include <errno.h>
 #include <ncurses.h>
 #include <stdlib.h>
@@ -46,12 +48,7 @@ size_t get_index_width(struct section **sections, size_t n_sections) {
     return max_len;
 }
 
-sig_atomic_t had_winch = 0;
 int reload_content = 0;
-
-void winch_handler(int signo) {
-    had_winch = 1;
-}
 
 /*
  * NOTE:
@@ -64,8 +61,6 @@ void winch_handler(int signo) {
  *   - refactor the event loop, it's horrifying atm
  */
 void site(char *path) {
-    signal(SIGWINCH, winch_handler);
-
     struct window index_window;
     struct window separator_window;
     struct window content_window;
@@ -87,14 +82,6 @@ void site(char *path) {
     if (rv != 0) {
         gen_err_opening(&content_window.content);
     }
-
-    WINDOW *main_window = initscr();
-    cbreak();
-    halfdelay(1);
-    noecho();
-    curs_set(0);
-    nonl();
-    keypad(main_window, 1);
 
     int index_left_margin = 2;
     int index_cols = get_index_width(sections, n_sections);
@@ -298,12 +285,11 @@ void site(char *path) {
                 if (content_window.content.type == STATIC && content_window.content.lines != NULL) {
                     anim_tick(&content_window);
                     if (had_winch) {
-
                         delwin(index_window.window);
                         delwin(separator_window.window);
                         delwin(content_window.window);
-                        endwin();
 
+                        endwin();
                         refresh();
 
                         index_window.rows = LINES;
@@ -335,6 +321,7 @@ void site(char *path) {
                         render_ncontent(&index_window);
                         render_separator(&separator_window);
                         render_ncontent(&content_window);
+
 
                         refresh();
 
@@ -401,5 +388,4 @@ void site(char *path) {
     delwin(index_window.window);
     delwin(separator_window.window);
     delwin(content_window.window);
-    endwin();
 }

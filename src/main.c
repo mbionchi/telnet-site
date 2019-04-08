@@ -18,6 +18,7 @@
 #include "site.h"
 #include "splash.h"
 #include "data.h"
+#include "winch.h"
 
 #include <getopt.h>
 #include <stdlib.h>
@@ -50,8 +51,26 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Usage: %s --site <path-to-dir> [--splash <path-to-file>]\n", binary_name);
         exit(1);
     }
+
+    had_winch = 0;
+    signal(SIGWINCH, set_had_winch);
+
+    WINDOW *main_window = initscr();
+    cbreak();
+    halfdelay(1);
+    noecho();
+    curs_set(0);
+    nonl();
+    keypad(main_window, 1);
+
     if (splash_path) {
         splash(splash_path);
     }
-    site(site_path);
+    if (site_path) {
+        site(site_path);
+    }
+
+    endwin();
+
+    return 0;
 }

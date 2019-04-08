@@ -20,6 +20,7 @@
 #include "data.h"
 #include "render.h"
 #include "anim.h"
+#include "winch.h"
 
 #include <stdio.h>
 #include <stddef.h>
@@ -43,11 +44,7 @@ void splash(char *path) {
         gen_err_opening(&splash_window.content);
     }
 
-    splash_window.window = initscr();
-    cbreak();
-    halfdelay(1);
-    noecho();
-    curs_set(0);
+    splash_window.window = newwin(0,0,0,0);
 
     splash_window.cols = COLS;
     splash_window.rows = LINES;
@@ -65,10 +62,24 @@ void splash(char *path) {
     wrefresh(splash_window.window);
 
     int ch = getch();
-    // 410: idk why, but it has to do with SIGWINCH
-    while (ch == ERR || ch == 410) {
+    while (ch == ERR) {
         if (splash_window.content.type == STATIC) {
             anim_tick(&splash_window);
+            if (had_winch) {
+                delwin(splash_window.window);
+                endwin();
+                refresh();
+                splash_window.window = newwin(0,0,0,0);
+                splash_window.cols = COLS;
+                splash_window.rows = LINES;
+                free_nlines(splash_window.content.lines->formatted, splash_window.content.lines->n_formatted);
+                free_anim_refs(&splash_window);
+                splash_window.content.lines->n_formatted = flow_nlines(splash_window.content.lines->raw, splash_window.content.lines->n_raw, &splash_window.content.lines->formatted, splash_window.cols, 0);
+                render_ncontent(&splash_window);
+                refresh();
+                wrefresh(splash_window.window);
+                had_winch = 0;
+            }
             wrefresh(splash_window.window);
         }
         ch = getch();
@@ -77,6 +88,6 @@ void splash(char *path) {
     free_anim_refs(&splash_window);
     clear();
     wrefresh(splash_window.window);
-    endwin();
+    delwin(splash_window.window);
     return;
 }
