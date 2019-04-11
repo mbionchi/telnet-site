@@ -59,10 +59,8 @@ void render_nline(struct window *window, size_t cursor_y, struct nline *nline) {
         size_t cursor_x = 0; /* assume left-align by default */
         if (nline->align == RIGHT) {
             cursor_x = window->cols - s->len;
-            fprintf(stderr, "renderer detected right-align, cursor_x = %d\n", cursor_x);
         } else if (nline->align == CENTER) {
             cursor_x = (window->cols - s->len)/2;
-            fprintf(stderr, "renderer detected center-align, cursor_x = %d\n", cursor_x);
         }
         scrollok(window->window, 0);
         mvwprintw(window->window, cursor_y, cursor_x, "%s", s->data);
