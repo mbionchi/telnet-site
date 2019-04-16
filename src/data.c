@@ -32,8 +32,33 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <wchar.h>
 
-#define ERR_OPENING_FILE_STR "<error opening file>"
+ssize_t mygetline(char_t **to, FILE *fp) {
+    size_t nmemb = 4096;
+    size_t step = 4096;
+    *to = malloc(nmemb*sizeof(char_t));
+    size_t i = 0;
+    int_t wc = myfgetc(fp);
+    while (wc != MYEOF && wc != (wint_t)'\n') {
+        if (i >= nmemb) {
+            nmemb += step;
+            *to = realloc(*to, nmemb*sizeof(char_t));
+        }
+        (*to)[i] = wc;
+        i++;
+        wc = myfgetc(fp);
+    }
+    if (wc == MYEOF && i == 0) {
+        free(*to);
+        return -1;
+    } else {
+        nmemb = i+1;
+        *to = realloc(*to, nmemb*sizeof(char_t));
+        (*to)[i] = (char_t)'\0';
+        return nmemb-1;
+    }
+}
 
 void dump_sections(struct section **sections, size_t n_sections) {
     fprintf(stderr, "%u sections total\n", n_sections);
@@ -114,7 +139,7 @@ struct section **read_sections(DIR *dir, char *dirname, size_t *nmemb) {
                     base = realloc(base, *nmemb*sizeof(struct section*));
                 }
                 base[i] = malloc(sizeof(struct section));
-                char *title = index(dirent->d_name, '-');
+                char *title = strchr(dirent->d_name, '-');
                 if (!title) {
                     title = dirent->d_name;
                 } else {
@@ -145,9 +170,16 @@ struct section **read_sections(DIR *dir, char *dirname, size_t *nmemb) {
 struct nline *mkblank() {
     struct nline *blank = malloc(sizeof(struct nline));
     blank->type = TEXT;
+    blank->align = LEFT;
     blank->text = malloc(sizeof(struct string));
     blank->text->len = 0;
-    blank->text->data = strcpy(malloc(1*sizeof(char)), "");
+    blank->text->data = mystrcpy(malloc(1*sizeof(char_t)),
+#ifdef ENABLE_WCHAR
+            L""
+#else
+            ""
+#endif
+            );
     return blank;
 }
 
@@ -159,16 +191,16 @@ void gen_err_opening(struct content *content) {
     content->lines->raw[0] = malloc(sizeof(struct nline));
     content->lines->raw[0]->type = TEXT;
     content->lines->raw[0]->text = malloc(sizeof(struct string));
-    content->lines->raw[0]->text->data = strcpy(malloc((strlen(ERR_OPENING_FILE_STR)+1)*sizeof(char)), ERR_OPENING_FILE_STR);
-    content->lines->raw[0]->text->len = strlen(ERR_OPENING_FILE_STR);
+    content->lines->raw[0]->text->data = mystrcpy(malloc((mystrlen(ERR_OPENING_FILE_STR)+1)*sizeof(char_t)), ERR_OPENING_FILE_STR);
+    content->lines->raw[0]->text->len = mystrlen(ERR_OPENING_FILE_STR);
 }
 
-struct nline *string2nline(char *str) {
+struct nline *string2nline(char_t *str) {
     struct nline *nline = malloc(sizeof(struct nline));
     nline->type = TEXT;
     nline->text = malloc(sizeof(struct string));
-    nline->text->len = strlen(str);
-    nline->text->data = strcpy(malloc((nline->text->len+1)*sizeof(char)), str);
+    nline->text->len = mystrlen(str);
+    nline->text->data = mystrcpy(malloc((nline->text->len+1)*sizeof(char_t)), str);
     return nline;
 }
 
@@ -181,34 +213,29 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
     size_t nmemb = 8,
            linear_step = 8;
     *nlines = malloc(nmemb*sizeof(struct nline*));
-    char *line = NULL,
-         *full_line = NULL;
+    char_t *line = NULL,
+           *full_line = NULL;
     size_t line_buf_len = 0,
            full_line_len = 0;
     enum align align = LEFT;
-    ssize_t rv = getline(&line, &line_buf_len, fp);
-    while (rv != -1) {
-        line[rv-1] = '\0';
+    line_buf_len = mygetline(&line, fp);
+    while (line_buf_len != -1) {
         if (full_line == NULL) {
-            if (!strcmp(line, ANIM_HINT)) {
+            if (!mystrcmp(line, ANIM_HINT)) {
                 size_t n_anim_lines = 0;
                 size_t anim_line_index = n_raw;
                 size_t n_frames = 0;
                 free(line);
                 line = NULL;
-                line_buf_len = 0;
-                rv = getline(&line, &line_buf_len, fp);
-                line[rv-1] = '\0';
-                while (strcmp(line, LOOP_HINT) && strcmp(line, NOLOOP_HINT)) {
-                    if (!strncmp(line, FRAME_HINT, strlen(FRAME_HINT))) {
-                        size_t frame_delay = atoi(line+strlen(FRAME_HINT));
+                line_buf_len = mygetline(&line, fp);
+                while (mystrcmp(line, LOOP_HINT) && mystrcmp(line, NOLOOP_HINT)) {
+                    if (!mystrncmp(line, FRAME_HINT, mystrlen(FRAME_HINT))) {
+                        size_t frame_delay = mystrtol(line+mystrlen(FRAME_HINT), NULL, 10);
                         free(line);
                         line = NULL;
-                        line_buf_len = 0;
-                        rv = getline(&line, &line_buf_len, fp);
-                        line[rv-1] = '\0';
-                        while (strncmp(line, FRAME_HINT, strlen(FRAME_HINT)) &&
-                                strcmp(line, LOOP_HINT) && strcmp(line, NOLOOP_HINT)) {
+                        line_buf_len = mygetline(&line, fp);
+                        while (mystrncmp(line, FRAME_HINT, mystrlen(FRAME_HINT)) &&
+                                mystrcmp(line, LOOP_HINT) && mystrcmp(line, NOLOOP_HINT)) {
                             if (n_frames < 1) {
                                 struct nline *nline = malloc(sizeof(struct nline));
                                 nline->type = ANIM;
@@ -218,7 +245,7 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
                                 nline->anim->frames = malloc(nline->anim->nmemb_frames*sizeof(struct frame));
                                 nline->anim->frames[0].s = malloc(sizeof(struct string));
                                 nline->anim->frames[0].s->data = line;
-                                nline->anim->frames[0].s->len = rv-1;
+                                nline->anim->frames[0].s->len = line_buf_len;
                                 nline->anim->frames[0].delay = frame_delay;
                                 nline->anim->current_frame_index = 0;
                                 nline->anim->n_frames = 1;
@@ -242,43 +269,39 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
                                 }
                                 struct string *s = malloc(sizeof(struct string));
                                 s->data = line;
-                                s->len = rv-1;
+                                s->len = line_buf_len;
                                 anim->frames[anim->n_frames].s = s;
                                 anim->frames[anim->n_frames].delay = frame_delay;
                                 anim->n_frames++;
                                 anim_line_index++;
                             }
                             line = NULL;
-                            line_buf_len = 0;
-                            rv = getline(&line, &line_buf_len, fp);
-                            line[rv-1] = '\0';
+                            line_buf_len = mygetline(&line, fp);
                         }
                         n_frames++;
                         anim_line_index -= n_anim_lines;
                     } else {
                         line = NULL;
-                        line_buf_len = 0;
-                        rv = getline(&line, &line_buf_len, fp);
-                        line[rv-1] = '\0';
+                        line_buf_len = mygetline(&line, fp);
                     }
                 }
-                if (!strcmp(line, LOOP_HINT)) {
+                if (!mystrcmp(line, LOOP_HINT)) {
                     (*nlines)[n_raw]->anim->loop = 1;
-                } else if (!strcmp(line, NOLOOP_HINT)) {
+                } else if (!mystrcmp(line, NOLOOP_HINT)) {
                     (*nlines)[n_raw]->anim->loop = 0;
                 }
                 n_raw += n_anim_lines;
                 free(line);
                 goto next_line;
-            } else if (!strncmp(line, ALIGN_HINT, strlen(ALIGN_HINT))) {
-                char *how = index(line, ' ');
+            } else if (!mystrncmp(line, ALIGN_HINT, mystrlen(ALIGN_HINT))) {
+                char_t *how = mystrchr(line, ' ');
                 if (how != NULL) {
                     how++;
-                    if (!strcmp(how, ALIGN_LEFT_HINT)) {
+                    if (!mystrcmp(how, ALIGN_LEFT_HINT)) {
                         align = LEFT;
-                    } else if (!strcmp(how, ALIGN_RIGHT_HINT)) {
+                    } else if (!mystrcmp(how, ALIGN_RIGHT_HINT)) {
                         align = RIGHT;
-                    } else if (!strcmp(how, ALIGN_CENTER_HINT)) {
+                    } else if (!mystrcmp(how, ALIGN_CENTER_HINT)) {
                         align = CENTER;
                     }
                 }
@@ -286,13 +309,13 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
                 goto next_line;
             } else {
                 full_line = line;
-                full_line_len = rv-1;
+                full_line_len = line_buf_len;
             }
         }
         if (full_line != NULL && full_line_len > 0 && full_line[full_line_len-1] == ' ' && full_line != line) {
-            size_t new_full_line_len = full_line_len + rv-1;
-            full_line = realloc(full_line, (new_full_line_len+1)*sizeof(char));
-            full_line = strncat(full_line, line, new_full_line_len);
+            size_t new_full_line_len = full_line_len + line_buf_len;
+            full_line = realloc(full_line, (new_full_line_len+1)*sizeof(char_t));
+            full_line = mystrncat(full_line, line, new_full_line_len);
             full_line_len = new_full_line_len;
             free(line);
         }
@@ -313,8 +336,7 @@ size_t read_nlines(FILE *fp, struct nline ***nlines) {
         }
 next_line:
         line = NULL;
-        line_buf_len = 0;
-        rv = getline(&line, &line_buf_len, fp);
+        line_buf_len = mygetline(&line, fp);
     }
     return n_raw;
 }
@@ -329,7 +351,7 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
     n_to++;
     while (i < n_from) {
         if (from[i]->type == TEXT) {
-                char *head = from[i]->text->data;
+                char_t *head = from[i]->text->data;
                 size_t head_len = from[i]->text->len;
                 unsigned prepend_space;
                 struct string *s = malloc(sizeof(struct string));
@@ -344,30 +366,30 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
                 if (!found_non_whitespace || prepend_space == head_len) {
                     prepend_space = 0;
                 }
-                char *tail = head;
+                char_t *tail = head;
                 int split_index, prev_split_index;
                 while (tail != NULL) {
-                    tail = index(head, ' ');
+                    tail = mystrchr(head, ' ');
                     split_index = tail-head;
                     prev_split_index = split_index;
                     while (tail != NULL && split_index+prepend_space < width) {
                         prev_split_index = split_index;
-                        tail = index(tail+1, ' ');
+                        tail = mystrchr(tail+1, ' ');
                         split_index = tail-head;
                     }
-                    if (tail != NULL || strlen(head)+prepend_space > width) {
+                    if (tail != NULL || mystrlen(head)+prepend_space > width) {
                         struct string *s1 = malloc(sizeof(struct string));
                         head[prev_split_index] = '\0';
                         if (head == from[i]->text->data) {
-                            s1->len = strlen(head);
-                            s1->data = strcpy(malloc((s1->len+1)*sizeof(char)), head);
+                            s1->len = mystrlen(head);
+                            s1->data = mystrcpy(malloc((s1->len+1)*sizeof(char_t)), head);
                         } else {
-                            s1->len = strlen(head)+prepend_space;
-                            s1->data = malloc((s1->len+1)*sizeof(char));
+                            s1->len = mystrlen(head)+prepend_space;
+                            s1->data = malloc((s1->len+1)*sizeof(char_t));
                             for (int i=0; i<prepend_space; i++) {
                                 s1->data[i] = ' ';
                             }
-                            strcpy(s1->data+prepend_space, head);
+                            mystrcpy(s1->data+prepend_space, head);
                         }
                         struct nline *nline = malloc(sizeof(struct nline));
                         nline->type = TEXT;
@@ -384,15 +406,15 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
                     }
                 }
                 if (head == from[i]->text->data) {
-                    s->len = strlen(head);
-                    s->data = strcpy(malloc((s->len+1)*sizeof(char)), head);
+                    s->len = mystrlen(head);
+                    s->data = mystrcpy(malloc((s->len+1)*sizeof(char_t)), head);
                 } else {
-                    s->len = strlen(head)+prepend_space;
-                    s->data = malloc((s->len+1)*sizeof(char));
+                    s->len = mystrlen(head)+prepend_space;
+                    s->data = malloc((s->len+1)*sizeof(char_t));
                     for (int i=0; i<prepend_space; i++) {
                         s->data[i] = ' ';
                     }
-                    strcpy(s->data+prepend_space, head);
+                    mystrcpy(s->data+prepend_space, head);
                 }
                 struct nline *nline = malloc(sizeof(struct nline));
                 nline->type = TEXT;
@@ -420,7 +442,7 @@ size_t flow_nlines(struct nline **from, size_t n_from, struct nline ***to, int w
                 size_t tmp_len = from[i]->anim->frames[i_frame].s->len > width ? width : from[i]->anim->frames[i_frame].s->len;
                 nline->anim->frames[i_frame].s->len = tmp_len;
                 nline->anim->frames[i_frame].s->data =
-                    strncpy(malloc(tmp_len*sizeof(char)+1),
+                    mystrncpy(malloc(tmp_len*sizeof(char_t)+1),
                             from[i]->anim->frames[i_frame].s->data,
                             tmp_len);
                 nline->anim->frames[i_frame].s->data[tmp_len] = '\0';
@@ -449,20 +471,22 @@ size_t gen_index(struct section **sections, size_t nmemb, struct nline ***to, si
     *to = malloc((nmemb+2)*sizeof(struct nline*));
     (*to)[0] = mkblank();
     for (size_t i = 0; i < nmemb; i++) {
-        struct string *s = malloc(sizeof(struct string));
-        s->data = malloc((width+1)*sizeof(char));
-        s->len = width;
-        size_t j = 0;
         size_t title_len = strlen(sections[i]->title);
-        while (j < width-title_len) {
-            s->data[j] = ' ';
-            j++;
+        struct string *s = malloc(sizeof(struct string));
+        s->data = malloc((title_len+1)*sizeof(char_t));
+        s->len = title_len;
+        for (int j = 0; j < title_len; j++) {
+            s->data[j] = (char_t)sections[i]->title[j];
         }
-        strncpy(s->data+j, sections[i]->title, width-j);
-        s->data[s->len] = '\0';
+#ifdef ENABLE_WCHAR
+        s->data[title_len] = L'\0';
+#else
+        s->data[title_len] = '\0';
+#endif
         struct nline *nline = malloc(sizeof(struct nline));
         nline->type = TEXT;
         nline->text = s;
+        nline->align = RIGHT;
         (*to)[i+1] = nline;
     }
     (*to)[nmemb+1] = mkblank();

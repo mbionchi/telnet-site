@@ -22,6 +22,8 @@
 
 #include <getopt.h>
 #include <stdlib.h>
+#include <locale.h>
+#include <ncurses.h>
 
 enum { SITE_INDEX, SPLASH_INDEX };
 
@@ -55,6 +57,7 @@ int main(int argc, char **argv) {
     had_winch = 0;
     signal(SIGWINCH, set_had_winch);
 
+    setlocale(LC_ALL, "");
     WINDOW *main_window = initscr();
     cbreak();
     halfdelay(1);

@@ -63,7 +63,11 @@ void render_nline(struct window *window, size_t cursor_y, struct nline *nline) {
             cursor_x = (window->cols - s->len)/2;
         }
         scrollok(window->window, 0);
+#ifdef ENABLE_WCHAR
+        mvwaddwstr(window->window, cursor_y, cursor_x, s->data);
+#else
         mvwprintw(window->window, cursor_y, cursor_x, "%s", s->data);
+#endif
         scrollok(window->window, 1);
     }
 }
