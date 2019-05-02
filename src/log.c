@@ -20,20 +20,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <time.h>
 
-#define LOGPATH "/tmp/telnetsite"
+char *lvl_str[] = {
+    "INFO",
+    "WARN",
+    "ERROR",
+    "NIL"
+};
 
-void errlog(char *fmt, ...) {
-    static FILE *fp = NULL;
-    if (fp == NULL) {
-        fp = fopen(LOGPATH, "a");
+void log_(enum log_lvl lvl, char *s) {
+    static char *ip = NULL;
+    if (!ip) {
+        ip = getenv("TCPREMOTEIP");
+        if (!ip) {
+            ip = "<unknown>";
+        }
     }
-    if (fp != NULL) {
-        va_list args;
-        va_start(args, fmt);
-        vfprintf(fp, fmt, args);
-        fflush(fp);
-        va_end(args);
+
+    if (lvl < 0 || lvl > 3) {
+        lvl = 3;
     }
+
+    time_t now;
+    time(&now);
+    struct tm *tm = gmtime(&now);
+    char date[20] = "";
+    if (tm) {
+        snprintf(date, 20, "%04d-%02d-%02dt%02d-%02d-%02d",
+                           tm->tm_year + 1900, tm->tm_mon+1, tm->tm_mday,
+                           tm->tm_hour, tm->tm_min, tm->tm_sec);
+    }
+    fprintf(stderr, "%-19s    %-15s    %-5s    %s\n", date, ip, lvl_str[lvl], s);
 }
 

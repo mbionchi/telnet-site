@@ -18,8 +18,15 @@
 #ifndef _TELNETSITE_LOG_H
 #define _TELNETSITE_LOG_H
 
-#include <stdarg.h>
+enum log_lvl {
+    LOG_INFO = 0,
+    LOG_WARN = 1,
+    LOG_ERR = 2,
+    LOG_NIL = 3
+};
 
-void errlog(char *fmt, ...);
+extern char *lvl_str[];
+
+void log_(enum log_lvl lvl, char *s);
 
 #endif

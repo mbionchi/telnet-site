@@ -19,6 +19,7 @@
 #include "splash.h"
 #include "data.h"
 #include "winch.h"
+#include "log.h"
 
 #include <getopt.h>
 #include <stdlib.h>
@@ -49,8 +50,15 @@ int main(int argc, char **argv) {
         opt = getopt_long_only(argc, argv, "", options, NULL);
     }
 
+    char *term = getenv("TERM");
+    if (!term) {
+        term = "unknown";
+    }
+    char log_str[256] = "";
+    snprintf(log_str, 256, "started session, TERM is %s", term);
+    log_(LOG_INFO, log_str);
     if (!site_path) {
-        fprintf(stderr, "Usage: %s --site <path-to-dir> [--splash <path-to-file>]\n", binary_name);
+        log_(LOG_ERR, "usage: telnetsite --site <path-to-dir> [--splash <path-to-file>]");
         exit(1);
     }
 
@@ -74,6 +82,6 @@ int main(int argc, char **argv) {
     }
 
     endwin();
-
+    log_(LOG_INFO, "ended session");
     return 0;
 }
