@@ -18,6 +18,9 @@
 #ifndef _TELNET_SITE_DATA_H
 #define _TELNET_SITE_DATA_H
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include <stdio.h>
 #include <dirent.h>

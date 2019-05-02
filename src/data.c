@@ -20,7 +20,6 @@
 #endif
 
 #include "data.h"
-
 #include "module.h"
 
 #include <dlfcn.h>
