@@ -24,10 +24,20 @@ BUILDING
   If you have autotools, you can just run
     ./autogen.sh
 and then do the normal `./configure && make && make install` with your favourite
-flags.
+flags.  See BUILD-TIME OPTIONS to find out about features you can compile in or out.
 
   Otherwise, you can run
     gcc -o telnetsite -lncurses -ldl -Isrc ./src/*.c
+
+
+BUILD-TIME OPTIONS
+------------------
+
+  You can pass the following options to the configure script:
+
+    --disable-follow-link       Disable following symbolic links when reading content files.
+
+    --enable-unicode            Enable unicode support for content files (note: not filenames).
 
 
 SERVING OVER TELNET
