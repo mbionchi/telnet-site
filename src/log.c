@@ -29,7 +29,7 @@ char *lvl_str[] = {
     "NIL"
 };
 
-void log_(enum log_lvl lvl, char *s) {
+void log_(enum log_lvl lvl, char *fmt, ...) {
     static char *ip = NULL;
     if (!ip) {
         ip = getenv("TCPREMOTEIP");
@@ -42,6 +42,18 @@ void log_(enum log_lvl lvl, char *s) {
         lvl = 3;
     }
 
+    char *str = NULL;
+    size_t str_len = 0;
+    va_list args;
+    va_start(args, fmt);
+    str_len = vsnprintf(str, str_len, fmt, args);
+    va_end(args);
+    str_len++;
+    str = malloc(sizeof(char)*str_len);
+    va_start(args, fmt);
+    str_len = vsnprintf(str, str_len, fmt, args);
+    va_end(args);
+
     time_t now;
     time(&now);
     struct tm *tm = gmtime(&now);
@@ -51,6 +63,7 @@ void log_(enum log_lvl lvl, char *s) {
                            tm->tm_year + 1900, tm->tm_mon+1, tm->tm_mday,
                            tm->tm_hour, tm->tm_min, tm->tm_sec);
     }
-    fprintf(stderr, "%-19s    %-15s    %-5s    %s\n", date, ip, lvl_str[lvl], s);
+    fprintf(stderr, "%-19s    %-15s    %-5s    %s\n", date, ip, lvl_str[lvl], str);
+    free(str);
 }
 

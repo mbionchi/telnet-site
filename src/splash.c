@@ -21,6 +21,7 @@
 #include "render.h"
 #include "anim.h"
 #include "winch.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <stddef.h>
@@ -30,7 +31,7 @@
 #include <string.h>
 #include <signal.h>
 
-void splash(char *path) {
+int splash(char *path) {
     struct window splash_window;
 
     FILE *fp = fopen(path, "r");
@@ -40,7 +41,7 @@ void splash(char *path) {
         splash_window.content.lines->n_raw = read_nlines(fp, &splash_window.content.lines->raw);
         fclose(fp);
     } else {
-        fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), path);
+        log_(LOG_WARN, "%s:%s:%u: %s: %s", binary_name, __FILE__, __LINE__, strerror(errno), path);
         gen_err_opening(&splash_window.content);
     }
 
@@ -90,5 +91,5 @@ void splash(char *path) {
     clear();
     wrefresh(splash_window.window);
     delwin(splash_window.window);
-    return;
+    return 0;
 }

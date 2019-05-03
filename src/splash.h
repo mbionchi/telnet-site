@@ -18,6 +18,6 @@
 #ifndef _TELNET_SPLASH_SITE_H
 #define _TELNET_SPLASH_SITE_H
 
-void splash(char *path);
+int splash(char *path);
 
 #endif

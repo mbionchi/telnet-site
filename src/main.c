@@ -50,15 +50,9 @@ int main(int argc, char **argv) {
         opt = getopt_long_only(argc, argv, "", options, NULL);
     }
 
-    char *term = getenv("TERM");
-    if (!term) {
-        term = "unknown";
-    }
-    char log_str[256] = "";
-    snprintf(log_str, 256, "started session, TERM is %s", term);
-    log_(LOG_INFO, log_str);
+    log_(LOG_INFO, "started session, TERM is %s", getenv("TERM"));
     if (!site_path) {
-        log_(LOG_ERR, "usage: telnetsite --site <path-to-dir> [--splash <path-to-file>]");
+        log_(LOG_ERR, "usage: %s --site <path-to-dir> [--splash <path-to-file>]", binary_name);
         exit(1);
     }
 
@@ -70,18 +64,20 @@ int main(int argc, char **argv) {
     cbreak();
     halfdelay(1);
     noecho();
-    curs_set(0);
+    int curs_save = curs_set(0);
     nonl();
     keypad(main_window, 1);
 
+    int rv = 0;
     if (splash_path) {
-        splash(splash_path);
+        rv |= splash(splash_path);
     }
     if (site_path) {
-        site(site_path);
+        rv |= site(site_path);
     }
 
+    curs_set(curs_save);
     endwin();
-    log_(LOG_INFO, "ended session");
-    return 0;
+    log_(rv?LOG_ERR:LOG_INFO, "ended session with status %d", rv);
+    return rv;
 }

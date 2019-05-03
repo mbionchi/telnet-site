@@ -21,6 +21,7 @@
 
 #include "data.h"
 #include "module.h"
+#include "log.h"
 
 #include <dlfcn.h>
 #include <stdlib.h>
@@ -82,7 +83,7 @@ int read_content_from_section(struct content *content, struct section *section) 
             content->lines->n_raw = read_nlines(fp, &content->lines->raw);
             fclose(fp);
         } else {
-            fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), section->filename);
+            log_(LOG_WARN, "%s:%s:%u: %s: %s", binary_name, __FILE__, __LINE__, strerror(errno), section->filename);
             free(content->lines);
             content->lines = NULL;
             return 1;
@@ -92,14 +93,14 @@ int read_content_from_section(struct content *content, struct section *section) 
         content->dlib = malloc(sizeof(struct dynamic_content));
         content->dlib->so_handle = dlopen(section->filename, RTLD_LAZY);
         if (content->dlib->so_handle == NULL) {
-            fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, dlerror());
+            log_(LOG_WARN, "%s:%s:%u: %s: %s", binary_name, __FILE__, __LINE__, dlerror(), section->filename);
             free(content->dlib);
             content->dlib = NULL;
             return 1;
         } else {
             content->dlib->init_fun = dlsym(content->dlib->so_handle, INIT_FUNC_NAME_S);
             if (content->dlib->init_fun == NULL) {
-                fprintf(stderr, "[W] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, dlerror());
+                log_(LOG_WARN, "%s:%s:%u: %s: %s", binary_name, __FILE__, __LINE__, dlerror());
                 dlclose(content->dlib->so_handle);
                 free(content->dlib);
                 content->dlib = NULL;

@@ -27,6 +27,6 @@ enum log_lvl {
 
 extern char *lvl_str[];
 
-void log_(enum log_lvl lvl, char *s);
+void log_(enum log_lvl lvl, char *fmt, ...);
 
 #endif

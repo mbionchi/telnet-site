@@ -22,6 +22,7 @@
 #include "scroll.h"
 #include "data.h"
 #include "winch.h"
+#include "log.h"
 
 #include <errno.h>
 #include <ncurses.h>
@@ -60,7 +61,7 @@ int reload_content = 0;
  *   - error handling everywhere please
  *   - refactor the event loop, it's horrifying atm
  */
-void site(char *path) {
+int site(char *path) {
     struct window index_window;
     struct window separator_window;
     struct window content_window;
@@ -72,8 +73,8 @@ void site(char *path) {
     size_t n_sections;
     DIR *dir = opendir(path);
     if (dir == NULL) {
-        fprintf(stderr, "[E] %s:%s:%u: %s: %s\n", binary_name, __FILE__, __LINE__, strerror(errno), path);
-        exit(1);
+        log_(LOG_ERR, "%s:%s:%u: %s: %s", binary_name, __FILE__, __LINE__, strerror(errno), path);
+        return 1;
     }
     struct section **sections = read_sections(dir, path, &n_sections);
     closedir(dir);
@@ -388,4 +389,5 @@ void site(char *path) {
     delwin(index_window.window);
     delwin(separator_window.window);
     delwin(content_window.window);
+    return 0;
 }

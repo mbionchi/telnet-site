@@ -18,6 +18,6 @@
 #ifndef _TELNET_SITE_SITE_H
 #define _TELNET_SITE_SITE_H
 
-void site(char *site_path);
+int site(char *site_path);
 
 #endif
